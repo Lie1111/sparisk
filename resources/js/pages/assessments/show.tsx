@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BreadcrumbItem } from '@/types'
-import { ArrowLeft, Target, Dumbbell, CalendarDays, Star, Info, TrendingUp, Activity } from 'lucide-react'
+import { ArrowLeft, Target, Dumbbell, CalendarDays, Star, Info, TrendingUp, Activity, Camera } from 'lucide-react'
+import PoseLandmarkCapture from '@/components/pose-landmark-capture'
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: '/dashboard' },
@@ -98,6 +99,7 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
                         <TabsTrigger value="exercises"><Dumbbell className="mr-2 h-4 w-4" />Exercises</TabsTrigger>
                         <TabsTrigger value="massage"><Star className="mr-2 h-4 w-4" />Massage</TabsTrigger>
                         <TabsTrigger value="program"><CalendarDays className="mr-2 h-4 w-4" />Weekly Program</TabsTrigger>
+                        <TabsTrigger value="capture"><Camera className="mr-2 h-4 w-4" />Capture</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="measurements" className="mt-4">
@@ -258,6 +260,13 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
                                 </CardContent>
                             </Card>
                         )}
+                    </TabsContent>
+
+                    <TabsContent value="capture" className="mt-4">
+                        <PoseLandmarkCapture
+                            assessmentId={assessment.id}
+                            existingViews={(assessment.images || []).map((img: any) => img.view)}
+                        />
                     </TabsContent>
                 </Tabs>
             </div>

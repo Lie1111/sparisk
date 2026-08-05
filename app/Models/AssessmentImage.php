@@ -8,7 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class AssessmentImage extends Model
 {
     protected $fillable = [
-        'posture_assessment_id', 'view', 'image_path', 'order_index'
+        'posture_assessment_id', 'view', 'image_path', 'landmarks', 'order_index'
+    ];
+
+    protected $casts = [
+        'landmarks' => 'array',
     ];
 
     public function assessment(): BelongsTo
