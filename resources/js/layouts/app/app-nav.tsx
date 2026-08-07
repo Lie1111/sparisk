@@ -9,27 +9,23 @@ export default function NavRoutes() {
             isActive: route().current("dashboard")
         },
         {
-            title: "SATA Platform",
-            url: "patients.index",
+            title: "Patients",
+            url: "/patients",
             icon: Activity,
-            isActive: route().current("patients.index") || route().current("academies.index"),
-            items: [
-                {
-                    title: "Patients",
-                    url: "patients.index",
-                },
-                {
-                    title: "Academies",
-                    url: "academies.index",
-                },
-            ],
+            isActive: route().current("patients.index"),
         },
         {
-            title: "SS NFC",
-            url: "smartsecure.index",
-            icon: Layers3,
-            isActive: route().current("smartsecure.index")
+            title: "Academies",
+            url: "academies.index",
+            icon: School,
+            isActive: route().current("academies.index"),
         },
+        // {
+        //     title: "SS NFC",
+        //     url: "smartsecure.index",
+        //     icon: Layers3,
+        //     isActive: route().current("smartsecure.index")
+        // },
 
 
         {

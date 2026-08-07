@@ -2,6 +2,7 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, Sideba
 import { type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
+import { cn } from '@/lib/utils';
 import { ChevronRight } from 'lucide-react';
 
 export function NavMain(props: any) {
@@ -62,10 +63,15 @@ export function NavMain(props: any) {
 
                     return (
                         <SidebarMenuItem key={item.title}>
-                            <SidebarMenuButton asChild>
-                                <Link href={route(item.url)} className={route().current(item.url)
-                                    ? ` bg-muted-foreground text-white `
-                                    : ` text-muted-foreground `}>
+                            <SidebarMenuButton
+                                tooltip={item.title}
+                                asChild
+                                isActive={item.isActive}
+                            >
+                                <Link href={typeof item.url === 'string' && item.url.startsWith('/') ? item.url : route(item.url)} className={cn(
+                                    "group/label text-sm",
+                                    item.isActive && "font-medium text-primary"
+                                )}>
                                     {item.icon && <item.icon />}
                                     <span>{item.title}</span>
                                 </Link>
