@@ -9,11 +9,14 @@ class PostureMeasurement extends Model
 {
     protected $fillable = [
         'posture_assessment_id', 'view', 'section', 'label',
-        'value', 'unit', 'severity', 'status_text'
+        'value', 'reference_value', 'deviation', 'unit',
+        'severity', 'status_text'
     ];
 
     protected $casts = [
         'value' => 'decimal:2',
+        'reference_value' => 'decimal:2',
+        'deviation' => 'decimal:2',
     ];
 
     public function assessment(): BelongsTo

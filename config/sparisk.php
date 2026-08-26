@@ -10,7 +10,36 @@ return [
     | thresholds, classifications, and recommendation mappings are defined here.
     */
 
-    'version' => '1.0',
+    'version' => '1.1',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Age Groups (SATA Age-Based Posture Reference)
+    |--------------------------------------------------------------------------
+    | Fixed age bands used to resolve the age-based reference value for each
+    | posture parameter. A patient's age is mapped to one of these groups.
+    */
+    'age_groups' => [
+        '6-8'   => ['label' => '6–8 years',  'min' => 6,  'max' => 8],
+        '9-12'  => ['label' => '9–12 years', 'min' => 9,  'max' => 12],
+        '13-18' => ['label' => '13–18 years','min' => 13, 'max' => 18],
+        '19-49' => ['label' => '19–49 years','min' => 19, 'max' => 49],
+        '50+'   => ['label' => '50+ years',  'min' => 50, 'max' => null],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SATA Fixed Severity Bands
+    |--------------------------------------------------------------------------
+    | Deviation = ABS(Clinical Angle - Age Reference) is mapped to a band.
+    | Bands are evaluated top-down; `max` is exclusive.
+    */
+    'severity_bands' => [
+        ['min' => 0,  'max' => 5,   'level' => 'normal',   'label' => 'NORMAL',   'color' => 'green'],
+        ['min' => 5,  'max' => 10,  'level' => 'mild',     'label' => 'MILD',     'color' => 'yellow'],
+        ['min' => 10, 'max' => 20,  'level' => 'moderate', 'label' => 'MODERATE', 'color' => 'orange'],
+        ['min' => 20, 'max' => null, 'level' => 'severe',  'label' => 'SEVERE',   'color' => 'red'],
+    ],
 
     /*
     |--------------------------------------------------------------------------

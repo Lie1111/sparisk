@@ -9,9 +9,15 @@ export default function NavRoutes() {
             isActive: route().current("dashboard")
         },
         {
+            title: "Posture Settings",
+            url: "/posture-settings",
+            icon: Activity,
+            isActive: route().current("posture-settings.index"),
+        },
+        {
             title: "Patients",
             url: "/patients",
-            icon: Activity,
+            icon: Users,
             isActive: route().current("patients.index"),
         },
         {

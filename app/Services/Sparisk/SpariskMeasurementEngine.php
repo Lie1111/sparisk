@@ -4,22 +4,32 @@ namespace App\Services\Sparisk;
 
 use App\Models\PostureAssessment;
 use App\Models\PostureMeasurement;
+use App\Models\PostureSetting;
 
 class SpariskMeasurementEngine
 {
     /**
      * Process raw MediaPipe measurements and return structured data.
+     *
+     * Each measured value is compared against the SATA age-based reference for
+     * the patient's age group. The deviation (ABS(Clinical Angle - Age Reference))
+     * is then mapped to a fixed SATA severity band.
      */
     public function process(array $landmarks, PostureAssessment $assessment): array
     {
         $measurements = [];
         $config = config('sparisk.measurements');
 
+        $ageGroup = $this->resolveAgeGroup($assessment->patient?->age);
+        $references = $this->loadReferences($ageGroup);
+
         foreach ($landmarks as $section => $value) {
             if (!isset($config[$section])) continue;
 
             $def = $config[$section];
-            $severity = $this->classifySeverity($section, abs($value));
+            $referenceValue = $references[$def['view'] . '.' . $section] ?? 0;
+            $deviation = round(abs($value - $referenceValue), 2);
+            $severity = $this->classifyDeviation($deviation);
 
             $measurements[] = [
                 'posture_assessment_id' => $assessment->id,
@@ -27,9 +37,11 @@ class SpariskMeasurementEngine
                 'section' => $section,
                 'label' => $def['label'],
                 'value' => $value,
+                'reference_value' => $referenceValue,
+                'deviation' => $deviation,
                 'unit' => '°',
                 'severity' => $severity['level'],
-                'status_text' => $severity['status'],
+                'status_text' => $severity['label'],
             ];
         }
 
@@ -39,7 +51,56 @@ class SpariskMeasurementEngine
     }
 
     /**
+     * Resolve a patient age to a SATA age group key.
+     */
+    public function resolveAgeGroup(?int $age): string
+    {
+        $groups = config('sparisk.age_groups');
+
+        if ($age !== null) {
+            foreach ($groups as $key => $group) {
+                if ($age >= $group['min'] && ($group['max'] === null || $age <= $group['max'])) {
+                    return $key;
+                }
+            }
+        }
+
+        return '19-49';
+    }
+
+    /**
+     * Load the reference values for a given age group keyed by "view.section".
+     */
+    private function loadReferences(string $ageGroup): array
+    {
+        return PostureSetting::where('age_group', $ageGroup)
+            ->get()
+            ->mapWithKeys(fn (PostureSetting $setting) => [
+                $setting->view . '.' . $setting->section => (float) $setting->reference_value,
+            ])
+            ->toArray();
+    }
+
+    /**
+     * Classify a deviation value against the fixed SATA severity bands.
+     */
+    public function classifyDeviation(float $deviation): array
+    {
+        foreach (config('sparisk.severity_bands') as $band) {
+            if ($deviation >= $band['min'] && ($band['max'] === null || $deviation < $band['max'])) {
+                return ['level' => $band['level'], 'label' => $band['label']];
+            }
+        }
+
+        return ['level' => 'severe', 'label' => 'SEVERE'];
+    }
+
+    /**
      * Classify severity based on threshold configuration.
+     *
+     * Legacy helper that treats the supplied value as a raw deviation from a
+     * zero reference. Age-aware classification is handled through
+     * {@see self::classifyDeviation()}.
      */
     public function classifySeverity(string $section, float $value): array
     {
@@ -97,11 +158,11 @@ class SpariskMeasurementEngine
         $penalties = 0;
 
         foreach ($measurements as $m) {
-            $absValue = abs($m->value);
-            if ($absValue <= 1) continue;
-            if ($absValue <= 5) $penalties += 1;
-            elseif ($absValue <= 10) $penalties += 2;
-            elseif ($absValue <= 20) $penalties += 4;
+            $deviation = (float) ($m->deviation ?? abs($m->value));
+            if ($deviation <= 1) continue;
+            if ($deviation <= 5) $penalties += 1;
+            elseif ($deviation <= 10) $penalties += 2;
+            elseif ($deviation <= 20) $penalties += 4;
             else $penalties += 6;
         }
 

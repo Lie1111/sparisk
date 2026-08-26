@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AcademyController;
 use App\Http\Controllers\Api\HealthScreeningController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PostureAssessmentController;
+use App\Http\Controllers\Api\PostureSettingController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReportController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('patients/{patient}/assessments', [PostureAssessmentController::class, 'store']);
     Route::get('assessments/{postureAssessment}', [PostureAssessmentController::class, 'show']);
     Route::delete('assessments/{postureAssessment}', [PostureAssessmentController::class, 'destroy']);
+
+    // Posture Settings - SATA Age-Based Reference
+    Route::get('posture-settings', [PostureSettingController::class, 'index']);
 
     // Progress Tracking
     Route::post('progress/compare', [ProgressController::class, 'compare']);
