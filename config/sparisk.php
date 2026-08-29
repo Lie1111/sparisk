@@ -449,4 +449,39 @@ return [
         'can_follow_instruction' => 'Can follow simple instruction?',
         'can_stand_independently' => 'Can stand independently?',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Intervention Posture Types (CADANGAN INTERVENSI)
+    |--------------------------------------------------------------------------
+    | The postural conditions an admin can set up specific exercises /
+    | interventions for. Each key is a stable slug; the value is the label
+    | shown in the admin page. Interventions are further scoped by age group.
+    */
+    'intervention_posture_types' => [
+        'normal_neutral'     => 'Normal Neutral Posture',
+        'forward_head'       => 'Forward Head Posture',
+        'kyphosis'           => 'Kyphosis Posture (Increased Thoracic Kyphosis)',
+        'lordosis'           => 'Lordosis Posture (Increased Lumbar Lordosis)',
+        'kyphosis_lordosis'  => 'Kyphosis - Lordosis Posture',
+        'flatback'           => 'Flatback Posture',
+        'genu_recurvatum'    => 'Genu Recurvatum Posture',
+        'frontal_asymmetry'  => 'Frontal Postural Asymmetry',
+        'pronated_foot'      => 'Pronated Foot Posture',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Intervention Categories
+    |--------------------------------------------------------------------------
+    | The types of intervention/exercise an admin can assign to a posture type.
+    */
+    'intervention_categories' => [
+        'exercise'            => 'Exercise',
+        'stretching'          => 'Stretching',
+        'strengthening'       => 'Strengthening',
+        'postural_awareness'  => 'Postural Awareness',
+        'manual_therapy'      => 'Manual Therapy',
+        'lifestyle'           => 'Lifestyle / Ergonomics',
+    ],
 ];

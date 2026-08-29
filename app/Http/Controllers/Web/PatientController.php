@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
+use App\Models\PostureAssessment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -68,8 +69,15 @@ class PatientController extends Controller
     {
         $patient->load([
             'postureAssessments' => function ($q) {
-                $q->with(['classifications', 'images'])
-                    ->latest('assessment_date');
+                $q->with([
+                    'classifications',
+                    'images',
+                    'measurements',
+                    'exerciseRecommendations',
+                    'massageRecommendations',
+                    'weeklyPrograms',
+                    'reports',
+                ])->latest('assessment_date');
             },
             'healthScreenings' => function ($q) {
                 $q->latest('created_at');
@@ -97,6 +105,40 @@ class PatientController extends Controller
                 'updated_at' => $patient->updated_at,
                 'created_at' => $patient->created_at,
             ],
+        ]);
+    }
+
+    public function showAssessment(Patient $patient, PostureAssessment $postureAssessment)
+    {
+        if ($postureAssessment->patient_id !== $patient->id) {
+            abort(404);
+        }
+
+        $postureAssessment->load([
+            'patient',
+            'measurements',
+            'images',
+            'classifications',
+            'exerciseRecommendations',
+            'massageRecommendations',
+            'weeklyPrograms',
+            'reports',
+        ]);
+
+        $viewMeasurements = [];
+        foreach (['front', 'back', 'right_side', 'left_side'] as $view) {
+            $viewMeasurements[$view] = $postureAssessment->measurements
+                ->where('view', $view)
+                ->values();
+        }
+
+        return Inertia::render('patients/detail', [
+            'patient' => [
+                'id' => $patient->id,
+                'name' => $patient->name,
+            ],
+            'assessment' => $postureAssessment,
+            'viewMeasurements' => $viewMeasurements,
         ]);
     }
 

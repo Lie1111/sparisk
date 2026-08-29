@@ -17,6 +17,7 @@ interface FormDialogProps {
     openDialog: boolean
     size?: string
     formType?: string
+    confirmLabel?: string
 }
 
 export function FormDialog(props: FormDialogProps) {
@@ -49,7 +50,7 @@ export function FormDialog(props: FormDialogProps) {
                     }
                     <DialogFooter>
                         {
-                            props.formType !== 'view' && <Button onClick={props.setConfirmForm} disabled={props.processing}>Confirm</Button>
+                            props.formType !== 'view' && <Button onClick={props.setConfirmForm} disabled={props.processing}>{props.confirmLabel || 'Confirm'}</Button>
                         }
 
                         <Button onClick={handleCancel} variant={"outline"}>{props.formType === 'view' ? 'Close' : 'Cancel'}</Button>

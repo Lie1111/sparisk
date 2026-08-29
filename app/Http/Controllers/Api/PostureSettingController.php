@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PostureSeverityBand;
 use App\Models\PostureSetting;
 use Illuminate\Http\JsonResponse;
 
@@ -40,7 +41,7 @@ class PostureSettingController extends Controller
 
         return response()->json([
             'age_groups' => config('sparisk.age_groups'),
-            'severity_bands' => config('sparisk.severity_bands'),
+            'severity_bands' => PostureSeverityBand::orderedConfig(),
             'settings' => $grouped,
         ]);
     }

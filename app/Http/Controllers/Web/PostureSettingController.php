@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Models\PostureSeverityBand;
 use App\Models\PostureSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,10 +21,15 @@ class PostureSettingController extends Controller
             ->orderBy('age_group')
             ->get();
 
+        $severityBands = PostureSeverityBand::orderBy('min')->get();
+        if ($severityBands->isEmpty()) {
+            $severityBands = collect(config('sparisk.severity_bands'));
+        }
+
         return Inertia::render('posture-setting/index', [
             'settings' => $settings,
             'ageGroups' => config('sparisk.age_groups'),
-            'severityBands' => config('sparisk.severity_bands'),
+            'severityBands' => $severityBands,
         ]);
     }
 
@@ -46,5 +52,34 @@ class PostureSettingController extends Controller
         });
 
         return back()->with('success', 'Posture settings updated.');
+    }
+
+    /**
+     * Update the SATA fixed severity bands (ranges + display labels).
+     *
+     * The `level` key is intentionally read-only because the decision engine
+     * references it directly (e.g. conditions matching 'severe').
+     */
+    public function updateSeverityBands(Request $request)
+    {
+        $validated = $request->validate([
+            'bands' => 'required|array|min:1',
+            'bands.*.id' => 'required|integer|exists:posture_severity_bands,id',
+            'bands.*.min' => 'required|numeric|min:0',
+            'bands.*.max' => 'nullable|numeric|gt:bands.*.min',
+            'bands.*.label' => 'required|string|max:50',
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            foreach ($validated['bands'] as $band) {
+                PostureSeverityBand::where('id', $band['id'])->update([
+                    'min' => $band['min'],
+                    'max' => $band['max'],
+                    'label' => $band['label'],
+                ]);
+            }
+        });
+
+        return back()->with('success', 'Severity bands updated.');
     }
 }

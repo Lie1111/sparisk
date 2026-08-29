@@ -4,6 +4,7 @@ namespace App\Services\Sparisk;
 
 use App\Models\PostureAssessment;
 use App\Models\PostureMeasurement;
+use App\Models\PostureSeverityBand;
 use App\Models\PostureSetting;
 
 class SpariskMeasurementEngine
@@ -86,7 +87,7 @@ class SpariskMeasurementEngine
      */
     public function classifyDeviation(float $deviation): array
     {
-        foreach (config('sparisk.severity_bands') as $band) {
+        foreach (PostureSeverityBand::orderedConfig() as $band) {
             if ($deviation >= $band['min'] && ($band['max'] === null || $deviation < $band['max'])) {
                 return ['level' => $band['level'], 'label' => $band['label']];
             }

@@ -23,6 +23,8 @@ class DatabaseSeeder extends Seeder
         $this->call([
             RolePermissionSeeder::class,
             PostureSettingSeeder::class,
+            SeverityBandSeeder::class,
+            InterventionSeeder::class,
         ]);
     }
 }

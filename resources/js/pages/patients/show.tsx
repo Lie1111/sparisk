@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type BreadcrumbItem } from '@/types';
-import { ArrowLeft, Pencil, Trash2, Activity, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Activity, ClipboardList, FileText, Eye } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormDialog } from '@/components/form-dialog';
 import { useState } from 'react';
@@ -165,33 +165,51 @@ export default function Show({ patient }: { patient: PatientDetail }) {
                         {assessments.length === 0 ? (
                             <p className="text-sm text-muted-foreground">No assessments yet. Use the mobile app to perform posture assessments.</p>
                         ) : (
-                            <div className="space-y-2">
-                                {assessments.map((a: any) => (
-                                    <Link key={a.id} href={`/assessments/${a.id}`}>
-                                        <div className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                                                    (a.overall_score || 0) >= 80 ? 'bg-green-100 text-green-700' :
-                                                    (a.overall_score || 0) >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-                                                }`}>
-                                                    {a.overall_score ?? '-'}
+                            <div className="space-y-3">
+                                {assessments.map((a: any) => {
+                                    return (
+                                        <div key={a.id} className="rounded-lg border overflow-hidden">
+                                            <div className="flex items-center justify-between gap-3 p-3">
+                                                <Link href={`/assessments/${a.id}`} className="flex items-center gap-3 flex-1 min-w-0 hover:bg-transparent">
+                                                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                                        (a.overall_score || 0) >= 80 ? 'bg-green-100 text-green-700' :
+                                                        (a.overall_score || 0) >= 60 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                                                    }`}>
+                                                        {a.overall_score ?? '-'}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="font-medium">{a.time_mark}</span>
+                                                        <span className="text-sm text-muted-foreground ml-2">{a.assessment_date}</span>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                            {a.posture_classification && (
+                                                                <Badge variant="outline" className="text-xs">{a.posture_classification}</Badge>
+                                                            )}
+                                                            {a.overall_progress && (
+                                                                <Badge variant="secondary" className="text-xs">{a.overall_progress.replace(/_/g, ' ')}</Badge>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </Link>
+                                                <div className="flex shrink-0 items-center gap-2">
+                                                    <a
+                                                        href={`/assessments/${a.id}/word`}
+                                                        className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted/50"
+                                                    >
+                                                        <FileText className="h-3.5 w-3.5" />
+                                                        Word
+                                                    </a>
+                                                    <Link
+                                                        href={`/patients/${patient.id}/assessments/${a.id}`}
+                                                        className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted/50"
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                        Details
+                                                    </Link>
                                                 </div>
-                                                <div>
-                                                    <span className="font-medium">{a.time_mark}</span>
-                                                    <span className="text-sm text-muted-foreground ml-2">{a.assessment_date}</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {a.posture_classification && (
-                                                    <Badge variant="outline" className="text-xs">{a.posture_classification}</Badge>
-                                                )}
-                                                {a.overall_progress && (
-                                                    <Badge variant="secondary" className="text-xs">{a.overall_progress.replace(/_/g, ' ')}</Badge>
-                                                )}
                                             </div>
                                         </div>
-                                    </Link>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </CardContent>

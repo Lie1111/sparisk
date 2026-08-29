@@ -1,15 +1,24 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type BreadcrumbItem } from '@/types';
-import { Save } from 'lucide-react';
+import { Pencil, Save } from 'lucide-react';
 
 interface SettingData {
     id: number;
@@ -19,6 +28,21 @@ interface SettingData {
     age_group: string;
     reference_value: string;
     interpretation: string | null;
+}
+
+interface SeverityBandData {
+    id: number;
+    level: string;
+    min: string | number;
+    max: string | number | null;
+    label: string;
+    color: string;
+}
+
+interface BandDraft {
+    min: string;
+    max: string;
+    label: string;
 }
 
 const VIEW_META: Record<string, { label: string; description: string }> = {
@@ -35,7 +59,7 @@ export default function Index({
 }: {
     settings: SettingData[];
     ageGroups: Record<string, { label: string; min: number; max: number | null }>;
-    severityBands: { min: number; max: number | null; level: string; label: string; color: string }[];
+    severityBands: SeverityBandData[];
 }) {
     const initial = useMemo(
         () => Object.fromEntries(settings.map((s) => [String(s.id), String(s.reference_value)])),
@@ -52,6 +76,59 @@ export default function Index({
             value: Number(value),
         })),
     }));
+
+    // --- Severity bands editor state ---
+    const [bandsOpen, setBandsOpen] = useState(false);
+    const [bandDrafts, setBandDrafts] = useState<Record<string, BandDraft>>({});
+    const [savingBands, setSavingBands] = useState(false);
+
+    const openBandsEditor = () => {
+        const drafts: Record<string, BandDraft> = {};
+        severityBands.forEach((band) => {
+            drafts[String(band.id)] = {
+                min: String(band.min),
+                max: band.max === null ? '' : String(band.max),
+                label: band.label,
+            };
+        });
+        setBandDrafts(drafts);
+        setBandsOpen(true);
+    };
+
+    const updateBandDraft = (id: number, key: keyof BandDraft, value: string) => {
+        setBandDrafts((prev) => ({
+            ...prev,
+            [String(id)]: { ...prev[String(id)], [key]: value },
+        }));
+    };
+
+    const saveBands = () => {
+        const payload = severityBands
+            .map((band) => ({
+                id: band.id,
+                min: Number(bandDrafts[String(band.id)]?.min),
+                max:
+                    bandDrafts[String(band.id)]?.max === ''
+                        ? null
+                        : Number(bandDrafts[String(band.id)]?.max),
+                label: bandDrafts[String(band.id)]?.label,
+            }))
+            .filter((band) => !Number.isNaN(band.min) && (band.max === null || !Number.isNaN(band.max)));
+
+        setSavingBands(true);
+        router.post(
+            '/posture-settings/severity-bands',
+            { bands: payload },
+            {
+                onSuccess: () => {
+                    setBandsOpen(false);
+                    toast('Severity bands updated');
+                },
+                onError: () => toast('Failed to update severity bands'),
+                onFinish: () => setSavingBands(false),
+            },
+        );
+    };
 
     // group rows by view then section, keeping the id per age group
     const grouped = useMemo(() => {
@@ -108,11 +185,24 @@ export default function Index({
 
                 <Card className="mb-6">
                     <CardHeader>
-                        <CardTitle className="text-base">SATA Fixed Severity Bands</CardTitle>
-                        <CardDescription>
-                            Deviation = ABS(Clinical Angle − Age Reference). The deviation is mapped to a
-                            severity band below.
-                        </CardDescription>
+                        <div className="flex items-start justify-between gap-4">
+                            <div className="flex flex-col gap-1">
+                                <CardTitle className="text-base">SATA Fixed Severity Bands</CardTitle>
+                                <CardDescription>
+                                    Deviation = ABS(Clinical Angle − Age Reference). The deviation is mapped to
+                                    a severity band below.
+                                </CardDescription>
+                            </div>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 gap-1 shrink-0"
+                                onClick={openBandsEditor}
+                            >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Edit
+                            </Button>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-3">
@@ -209,6 +299,74 @@ export default function Index({
                         </Card>
                     );
                 })}
+
+                <Dialog open={bandsOpen} onOpenChange={setBandsOpen}>
+                    <DialogContent className="sm:max-w-xl">
+                        <DialogHeader>
+                            <DialogTitle>Edit Severity Bands</DialogTitle>
+                            <DialogDescription>
+                                Adjust the deviation ranges (degrees) for each band. Leave the last band&apos;s
+                                max empty for no upper limit.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            {severityBands.map((band) => {
+                                const draft = bandDrafts[String(band.id)];
+                                return (
+                                    <div key={band.id} className="flex items-center gap-3 rounded-md border p-3">
+                                        <span
+                                            className={`inline-block h-3 w-3 shrink-0 rounded-full ${
+                                                band.color === 'green'
+                                                    ? 'bg-green-500'
+                                                    : band.color === 'yellow'
+                                                      ? 'bg-yellow-400'
+                                                      : band.color === 'orange'
+                                                        ? 'bg-orange-500'
+                                                        : 'bg-red-500'
+                                            }`}
+                                        />
+                                        <span className="w-24 text-sm font-medium capitalize">{band.level}</span>
+                                        <div className="flex-1">
+                                            <Label className="text-xs text-muted-foreground">Label</Label>
+                                            <Input
+                                                value={draft?.label ?? ''}
+                                                onChange={(e) => updateBandDraft(band.id, 'label', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="w-20">
+                                            <Label className="text-xs text-muted-foreground">Min</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                value={draft?.min ?? ''}
+                                                onChange={(e) => updateBandDraft(band.id, 'min', e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="w-20">
+                                            <Label className="text-xs text-muted-foreground">Max</Label>
+                                            <Input
+                                                type="number"
+                                                step="0.1"
+                                                placeholder="∞"
+                                                value={draft?.max ?? ''}
+                                                onChange={(e) => updateBandDraft(band.id, 'max', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setBandsOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={saveBands} disabled={savingBands}>
+                                <Save className="h-3.5 w-3.5" />
+                                {savingBands ? 'Saving…' : 'Save Changes'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </main>
         </AppLayout>
     );

@@ -29,6 +29,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Posture Assessments - Full Pipeline
     Route::post('patients/{patient}/assessments', [PostureAssessmentController::class, 'store']);
+    Route::get('assessments', [PostureAssessmentController::class, 'index']);
     Route::get('assessments/{postureAssessment}', [PostureAssessmentController::class, 'show']);
     Route::delete('assessments/{postureAssessment}', [PostureAssessmentController::class, 'destroy']);
 

@@ -49,6 +49,7 @@ class PostureAssessmentController extends Controller
             'images' => 'nullable|array',
             'images.*.view' => 'required|in:front,back,right_side,left_side',
             'images.*.file' => 'required|image|max:10240',
+            'images.*.highlights' => 'nullable',
         ]);
 
         $previousAssessments = $patient->postureAssessments()->count();
@@ -97,6 +98,7 @@ class PostureAssessmentController extends Controller
                             'posture_assessment_id' => $assessment->id,
                             'view' => $imageData['view'],
                             'image_path' => $path,
+                            'highlights' => $this->decodeHighlights($imageData['highlights'] ?? null),
                             'order_index' => $index,
                         ]);
                     }
@@ -122,6 +124,23 @@ class PostureAssessmentController extends Controller
         }
     }
 
+    /**
+     * List all posture assessments across patients, newest first.
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $query = PostureAssessment::with(['patient' => fn($q) => $q->select(['id', 'name', 'age', 'gender'])]);
+
+        if ($request->filled('patient_id')) {
+            $query->where('patient_id', $request->patient_id);
+        }
+
+        $assessments = $query->orderBy('assessment_date', 'desc')
+            ->paginate($request->get('per_page', 50));
+
+        return response()->json($assessments);
+    }
+
     public function show(PostureAssessment $postureAssessment): JsonResponse
     {
         $postureAssessment->load([
@@ -132,6 +151,26 @@ class PostureAssessmentController extends Controller
         ]);
 
         return response()->json($postureAssessment);
+    }
+
+    /**
+     * Normalises the per-image highlight zones coming from the app.
+     *
+     * The Flutter app sends `images[i][highlights]` as a JSON-encoded array of
+     * rects (left/top/width/height in normalized 0..1 coords + type). This
+     * accepts either an already-decoded array or a JSON string.
+     */
+    private function decodeHighlights(mixed $raw): ?array
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (is_array($raw)) {
+            return $raw;
+        }
+        $decoded = json_decode((string) $raw, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     public function destroy(PostureAssessment $postureAssessment): JsonResponse
