@@ -25,6 +25,8 @@ class DatabaseSeeder extends Seeder
             PostureSettingSeeder::class,
             SeverityBandSeeder::class,
             InterventionSeeder::class,
+            PostureMarkerSeeder::class,
+            SataPostureMarkerSeeder::class,
         ]);
     }
 }

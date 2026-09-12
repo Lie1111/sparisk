@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AcademyController;
 use App\Http\Controllers\Api\HealthScreeningController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PostureAssessmentController;
+use App\Http\Controllers\Api\PostureMarkerController;
 use App\Http\Controllers\Api\PostureSettingController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReportController;
@@ -35,6 +36,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Posture Settings - SATA Age-Based Reference
     Route::get('posture-settings', [PostureSettingController::class, 'index']);
+
+    // Posture Markers - body character overlay markers
+    Route::get('posture-markers', [PostureMarkerController::class, 'index']);
 
     // Progress Tracking
     Route::post('progress/compare', [ProgressController::class, 'compare']);

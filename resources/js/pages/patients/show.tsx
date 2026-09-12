@@ -3,8 +3,9 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type BreadcrumbItem } from '@/types';
-import { ArrowLeft, Pencil, Trash2, Activity, ClipboardList, FileText, Eye } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Activity, ClipboardList, FileText, Eye, ChevronDown } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormDialog } from '@/components/form-dialog';
 import { useState } from 'react';
@@ -33,6 +34,7 @@ type PatientDetail = {
 export default function Show({ patient }: { patient: PatientDetail }) {
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [openEditDialog, setOpenEditDialog] = useState(false);
+    const [openScreenings, setOpenScreenings] = useState(false);
     const { data, setData, post, processing } = useForm<{ id: number }>({ id: patient.id });
     const patientForm = usePatientForm();
 
@@ -215,44 +217,51 @@ export default function Show({ patient }: { patient: PatientDetail }) {
                     </CardContent>
                 </Card>
 
-                <Card className="mt-4">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <ClipboardList className="h-4 w-4" />
-                            Health Screenings ({screenings.length})
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {screenings.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No health screenings recorded.</p>
-                        ) : (
-                            <div className="space-y-2">
-                                {screenings.map((s: any) => (
-                                    <div key={s.id} className="rounded-lg border p-3">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant={
-                                                s.safety_level === 'low' ? 'destructive' :
-                                                s.safety_level === 'medium' ? 'secondary' : 'default'
-                                            }>
-                                                {s.safety_level?.toUpperCase()}
-                                            </Badge>
-                                            <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleDateString('en-GB')}</span>
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap gap-1">
-                                            {s.fear_of_water && <Badge variant="outline" className="text-[10px]">Fear of Water</Badge>}
-                                            {s.history_of_seizure && <Badge variant="outline" className="text-[10px]">Seizure</Badge>}
-                                            {s.heart_disease && <Badge variant="outline" className="text-[10px]">Heart</Badge>}
-                                            {s.asthma && <Badge variant="outline" className="text-[10px]">Asthma</Badge>}
-                                            {s.neck_pain && <Badge variant="outline" className="text-[10px]">Neck Pain</Badge>}
-                                            {s.back_pain && <Badge variant="outline" className="text-[10px]">Back Pain</Badge>}
-                                            {s.hip_pain && <Badge variant="outline" className="text-[10px]">Hip Pain</Badge>}
-                                        </div>
+                <Collapsible open={openScreenings} onOpenChange={setOpenScreenings} className="mt-4">
+                    <Card>
+                        <CollapsibleTrigger asChild>
+                            <CardHeader className="cursor-pointer select-none">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <ClipboardList className="h-4 w-4" />
+                                    Health Screenings ({screenings.length})
+                                    <ChevronDown className={`ml-auto h-4 w-4 transition-transform duration-200 ${openScreenings ? 'rotate-180' : ''}`} />
+                                </CardTitle>
+                            </CardHeader>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                            <CardContent>
+                                {screenings.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No health screenings recorded.</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {screenings.map((s: any) => (
+                                            <div key={s.id} className="rounded-lg border p-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={
+                                                        s.safety_level === 'low' ? 'destructive' :
+                                                        s.safety_level === 'medium' ? 'secondary' : 'default'
+                                                    }>
+                                                        {s.safety_level?.toUpperCase()}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">{new Date(s.created_at).toLocaleDateString('en-GB')}</span>
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap gap-1">
+                                                    {s.fear_of_water && <Badge variant="outline" className="text-[10px]">Fear of Water</Badge>}
+                                                    {s.history_of_seizure && <Badge variant="outline" className="text-[10px]">Seizure</Badge>}
+                                                    {s.heart_disease && <Badge variant="outline" className="text-[10px]">Heart</Badge>}
+                                                    {s.asthma && <Badge variant="outline" className="text-[10px]">Asthma</Badge>}
+                                                    {s.neck_pain && <Badge variant="outline" className="text-[10px]">Neck Pain</Badge>}
+                                                    {s.back_pain && <Badge variant="outline" className="text-[10px]">Back Pain</Badge>}
+                                                    {s.hip_pain && <Badge variant="outline" className="text-[10px]">Hip Pain</Badge>}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                )}
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Card>
+                </Collapsible>
 
                 {openDeleteDialog && (
                     <ConfirmDialog open={openDeleteDialog} setConfirm={handleConfirmDelete} title="Confirm to delete patient?" setOpen={setOpenDeleteDialog} />

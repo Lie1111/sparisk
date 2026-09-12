@@ -68,6 +68,7 @@ class PostureSettingController extends Controller
             'bands.*.min' => 'required|numeric|min:0',
             'bands.*.max' => 'nullable|numeric|gt:bands.*.min',
             'bands.*.label' => 'required|string|max:50',
+            'bands.*.color' => 'required|string|in:green,yellow,orange,red',
         ]);
 
         DB::transaction(function () use ($validated) {
@@ -76,6 +77,7 @@ class PostureSettingController extends Controller
                     'min' => $band['min'],
                     'max' => $band['max'],
                     'label' => $band['label'],
+                    'color' => $band['color'],
                 ]);
             }
         });

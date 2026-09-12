@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type BreadcrumbItem } from '@/types';
 import { Pencil, Save } from 'lucide-react';
@@ -43,7 +44,17 @@ interface BandDraft {
     min: string;
     max: string;
     label: string;
+    color: string;
 }
+
+const BAND_COLORS = ['green', 'yellow', 'orange', 'red'] as const;
+
+const BAND_DOT: Record<string, string> = {
+    green: 'bg-green-500',
+    yellow: 'bg-yellow-400',
+    orange: 'bg-orange-500',
+    red: 'bg-red-500',
+};
 
 const VIEW_META: Record<string, { label: string; description: string }> = {
     front: { label: 'Front View', description: 'Frontal plane alignment & symmetry (A1–A11)' },
@@ -89,6 +100,7 @@ export default function Index({
                 min: String(band.min),
                 max: band.max === null ? '' : String(band.max),
                 label: band.label,
+                color: band.color,
             };
         });
         setBandDrafts(drafts);
@@ -112,6 +124,7 @@ export default function Index({
                         ? null
                         : Number(bandDrafts[String(band.id)]?.max),
                 label: bandDrafts[String(band.id)]?.label,
+                color: bandDrafts[String(band.id)]?.color,
             }))
             .filter((band) => !Number.isNaN(band.min) && (band.max === null || !Number.isNaN(band.max)));
 
@@ -332,6 +345,27 @@ export default function Index({
                                                 value={draft?.label ?? ''}
                                                 onChange={(e) => updateBandDraft(band.id, 'label', e.target.value)}
                                             />
+                                        </div>
+                                        <div className="w-28">
+                                            <Label className="text-xs text-muted-foreground">Colour</Label>
+                                            <Select
+                                                value={draft?.color ?? 'green'}
+                                                onValueChange={(v) => updateBandDraft(band.id, 'color', v)}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {BAND_COLORS.map((c) => (
+                                                        <SelectItem key={c} value={c}>
+                                                            <span className="flex items-center gap-2 capitalize">
+                                                                <span className={`inline-block h-3 w-3 rounded-full ${BAND_DOT[c]}`} />
+                                                                {c}
+                                                            </span>
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
                                         </div>
                                         <div className="w-20">
                                             <Label className="text-xs text-muted-foreground">Min</Label>

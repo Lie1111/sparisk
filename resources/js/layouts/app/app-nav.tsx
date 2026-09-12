@@ -1,4 +1,4 @@
-import { ClipboardCheck, Crown, Layers3, LayoutDashboard, MessageCircleWarning, RailSymbol, Settings, Settings2, Users, Activity, School, Watch, Wrench, Dumbbell } from "lucide-react";
+import { ClipboardCheck, Crown, Layers3, LayoutDashboard, MessageCircleWarning, RailSymbol, Settings, Settings2, Users, Activity, School, Watch, Wrench, Dumbbell, Crosshair } from "lucide-react";
 
 export default function NavRoutes() {
     return [
@@ -19,6 +19,12 @@ export default function NavRoutes() {
             url: "/interventions",
             icon: Dumbbell,
             isActive: route().current("interventions.index"),
+        },
+        {
+            title: "Posture Markers",
+            url: "/posture-markers",
+            icon: Crosshair,
+            isActive: route().current("posture-markers.index"),
         },
         {
             title: "Patients",

@@ -472,6 +472,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Posture Conditions (SATA Figures 1–12)
+    |--------------------------------------------------------------------------
+    | The posture classifications used by the body-marker editor. Each key is a
+    | stable slug; the value is the label shown in the admin page.
+    */
+    'posture_conditions' => [
+        'normal_neutral'    => 'Normal / Neutral Posture',
+        'forward_head'      => 'Forward Head Posture',
+        'rounded_shoulder'  => 'Rounded Shoulder Posture',
+        'kyphosis'          => 'Kyphosis Posture (Increased Thoracic Kyphosis)',
+        'lordosis'          => 'Lordosis Posture (Increased Lumbar Lordosis)',
+        'kyphosis_lordosis' => 'Kyphosis - Lordosis Posture',
+        'flatback'          => 'Flatback Posture',
+        'flexed_knee'       => 'Flexed-Knee Posture',
+        'genu_recurvatum'   => 'Genu Recurvatum Posture',
+        'frontal_asymmetry' => 'Frontal Postural Asymmetry',
+        'pronated_foot'     => 'Pronated Foot Posture',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Intervention Categories
     |--------------------------------------------------------------------------
     | The types of intervention/exercise an admin can assign to a posture type.
