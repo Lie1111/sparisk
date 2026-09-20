@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             RolePermissionSeeder::class,
             PostureSettingSeeder::class,
             SeverityBandSeeder::class,
+            BmiReferenceSeeder::class,
             InterventionSeeder::class,
             PostureMarkerSeeder::class,
             SataPostureMarkerSeeder::class,

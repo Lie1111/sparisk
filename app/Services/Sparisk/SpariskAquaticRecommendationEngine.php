@@ -4,13 +4,117 @@ namespace App\Services\Sparisk;
 
 use App\Models\ExerciseRecommendation;
 use App\Models\PostureAssessment;
+use App\Models\PostureIntervention;
 
 class SpariskAquaticRecommendationEngine
 {
     /**
-     * Generate aquatic exercise recommendations based on assessment classification.
+     * Program slug shared with config('sparisk.intervention_programs').
+     */
+    public const PROGRAM = 'aquatic_exercise';
+
+    public function __construct(private SpariskMeasurementEngine $measurements) {}
+
+    /**
+     * Generate aquatic exercise recommendations for an assessment.
+     *
+     * The admin-authored CADANGAN INTERVENSI rows are the source of truth: the
+     * title, level, prescription, description and image the admin saved are
+     * copied onto the recommendation so the app shows exactly what was set up.
+     * Only when the admin has nothing for this posture type / age band do we
+     * fall back to the built-in stage defaults so the report is never empty.
      */
     public function recommend(PostureAssessment $assessment): array
+    {
+        $interventions = $this->adminInterventions($assessment);
+
+        if ($interventions->isNotEmpty()) {
+            return $this->copyFromAdmin($assessment, $interventions);
+        }
+
+        return $this->fromConfig($assessment);
+    }
+
+    /**
+     * Admin rows for this assessment's posture type and age band, in the order
+     * the admin arranged them.
+     */
+    private function adminInterventions(PostureAssessment $assessment)
+    {
+        $postureType = $this->measurements->resolveInterventionPostureType($assessment->posture_classification);
+
+        $ageGroup = $this->measurements->resolveAgeGroup($assessment->patient?->age);
+
+        $query = fn (string $age) => PostureIntervention::query()
+            ->where('program', self::PROGRAM)
+            ->where('posture_type', $postureType)
+            ->where('age_group', $age)
+            ->orderBy('order_index')
+            ->orderBy('id')
+            ->get();
+
+        $interventions = $query($ageGroup);
+
+        // The catalogue is normally authored for the adolescent band, so an
+        // adult assessment would otherwise miss the admin's work entirely.
+        if ($interventions->isEmpty() && $ageGroup !== '13-18') {
+            $interventions = $query('13-18');
+        }
+
+        return $interventions;
+    }
+
+    /**
+     * Build one recommendation per admin entry, carrying the image across.
+     *
+     * @param  \Illuminate\Support\Collection<int, PostureIntervention>  $interventions
+     */
+    private function copyFromAdmin(PostureAssessment $assessment, $interventions): array
+    {
+        $recommendations = [];
+
+        foreach ($interventions as $orderIndex => $intervention) {
+            $recommendations[] = ExerciseRecommendation::create([
+                'posture_assessment_id' => $assessment->id,
+                'engine' => 'SARE',
+                'program' => self::PROGRAM,
+                'exercise_name' => $intervention->title,
+                'program_level' => $intervention->level,
+                // `difficulty` is a NOT NULL enum, so an admin entry without a
+                // level still needs a value.
+                'difficulty' => $intervention->level ?? 'beginner',
+                'estimated_duration_minutes' => $intervention->duration_minutes,
+                'image_url' => $intervention->image_src,
+                'sets_reps' => $intervention->sets_reps,
+                'progression_stage' => $this->stageFromLevel($intervention->level),
+                'instructions' => $intervention->description
+                    ?: $this->getExerciseInstructions($intervention->title),
+                'frequency' => $intervention->frequency,
+                'order_index' => $orderIndex,
+            ]);
+        }
+
+        return $recommendations;
+    }
+
+    /**
+     * `progression_stage` is an integer column, so the admin's level chip is
+     * stored as its stage number.
+     */
+    private function stageFromLevel(?string $level): ?int
+    {
+        return match ($level) {
+            'beginner' => 1,
+            'intermediate' => 2,
+            'advanced' => 3,
+            default => null,
+        };
+    }
+
+    /**
+     * Built-in stage-based defaults, used when the admin catalogue is empty.
+     */
+    private function fromConfig(PostureAssessment $assessment): array
     {
         $classification = $assessment->posture_classification ?? 'default';
         $exercises = config("sparisk.aquatic_exercises.{$classification}")
@@ -23,6 +127,7 @@ class SpariskAquaticRecommendationEngine
             $rec = ExerciseRecommendation::create([
                 'posture_assessment_id' => $assessment->id,
                 'engine' => 'SARE',
+                'program' => self::PROGRAM,
                 'exercise_name' => $exercise['name'],
                 'program_level' => $exercise['level'],
                 'difficulty' => $exercise['difficulty'],

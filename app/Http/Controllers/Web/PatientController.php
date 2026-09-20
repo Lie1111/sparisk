@@ -5,13 +5,21 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Models\PostureAssessment;
+use App\Services\Sparisk\SpariskBmiEngine;
+use App\Services\Sparisk\SpariskInterpretationEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class PatientController extends Controller
 {
+    public function __construct(
+        private SpariskInterpretationEngine $interpretationEngine,
+        private SpariskBmiEngine $bmiEngine,
+    ) {}
+
     public function index(Request $request)
     {
         $allowedSorts = ['name', 'age', 'created_at', 'updated_at'];
@@ -62,6 +70,7 @@ class PatientController extends Controller
         return Inertia::render('patients/index', [
             'patients' => $patients,
             'query' => $request->q ?? '',
+            ...$this->neuroOptions(),
         ]);
     }
 
@@ -99,12 +108,19 @@ class PatientController extends Controller
                 'emergency_contact_name' => $patient->emergency_contact_name,
                 'emergency_contact_phone' => $patient->emergency_contact_phone,
                 'special_needs_type' => $patient->special_needs_type,
+                'neuro_profile' => $patient->neuro_profile,
+                'neuro_profile_label' => $patient->neuro_profile_label,
+                'neuro_conditions' => $patient->neuro_conditions ?? [],
+                'neuro_condition_labels' => $patient->neuro_condition_labels,
+                'neuro_conditions_other' => $patient->neuro_conditions_other,
                 'archived_at' => $patient->archived_at,
+                'bmi' => $this->bmiEngine->forPatient($patient),
                 'posture_assessments' => $patient->postureAssessments,
                 'health_screenings' => $patient->healthScreenings,
                 'updated_at' => $patient->updated_at,
                 'created_at' => $patient->created_at,
             ],
+            ...$this->neuroOptions(),
         ]);
     }
 
@@ -125,12 +141,7 @@ class PatientController extends Controller
             'reports',
         ]);
 
-        $viewMeasurements = [];
-        foreach (['front', 'back', 'right_side', 'left_side'] as $view) {
-            $viewMeasurements[$view] = $postureAssessment->measurements
-                ->where('view', $view)
-                ->values();
-        }
+        $viewMeasurements = $this->interpretationEngine->measurementsByView($postureAssessment);
 
         return Inertia::render('patients/detail', [
             'patient' => [
@@ -139,7 +150,29 @@ class PatientController extends Controller
             ],
             'assessment' => $postureAssessment,
             'viewMeasurements' => $viewMeasurements,
+            'classification' => $this->interpretationEngine->classificationSummary($postureAssessment),
         ]);
+    }
+
+    /**
+     * Live BMI preview for the participant form. The category always comes from
+     * SpariskBmiEngine, so the web form, the mobile app and the API agree.
+     */
+    public function bmiPreview(Request $request)
+    {
+        $validated = $request->validate([
+            'age' => ['nullable', 'integer', 'min:0', 'max:150'],
+            'gender' => ['nullable', 'string', 'in:male,female,other'],
+            'height' => ['nullable', 'numeric', 'min:0', 'max:300'],
+            'weight' => ['nullable', 'numeric', 'min:0', 'max:500'],
+        ]);
+
+        return response()->json($this->bmiEngine->calculate(
+            $validated['age'] ?? null,
+            $validated['gender'] ?? null,
+            $validated['height'] ?? null,
+            $validated['weight'] ?? null,
+        ));
     }
 
     public function photo(string $path)
@@ -170,6 +203,9 @@ class PatientController extends Controller
                 'emergency_contact_name' => $this->nullIfEmpty($request->input('emergency_contact_name')),
                 'emergency_contact_phone' => $this->nullIfEmpty($request->input('emergency_contact_phone')),
                 'special_needs_type' => $this->nullIfEmpty($request->input('special_needs_type')),
+                'neuro_profile' => $this->nullIfEmpty($request->input('neuro_profile')),
+                'neuro_conditions' => $request->input('neuro_conditions', []),
+                'neuro_conditions_other' => $this->nullIfEmpty($request->input('neuro_conditions_other')),
             ];
 
             $validated = validator($data, [
@@ -184,7 +220,7 @@ class PatientController extends Controller
                 'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
                 'special_needs_type' => ['nullable', 'string', 'in:'.implode(',', $needs)],
                 'photo' => ['nullable', 'image', 'max:5120'],
-            ])->validate();
+            ] + $this->neuroProfileRules())->validate();
 
             $patient = Patient::create($validated);
 
@@ -230,6 +266,14 @@ class PatientController extends Controller
                 'special_needs_type' => $this->nullIfEmpty($request->input('special_needs_type')),
             ];
 
+            if ($request->hasAny(['neuro_profile', 'neuro_conditions', 'neuro_conditions_other'])) {
+                $data += [
+                    'neuro_profile' => $this->nullIfEmpty($request->input('neuro_profile')),
+                    'neuro_conditions' => $request->input('neuro_conditions', []),
+                    'neuro_conditions_other' => $this->nullIfEmpty($request->input('neuro_conditions_other')),
+                ];
+            }
+
             $validated = validator($data, [
                 'id' => ['required', 'integer', 'exists:patients,id'],
                 'name' => ['required', 'string', 'max:255'],
@@ -243,7 +287,7 @@ class PatientController extends Controller
                 'emergency_contact_phone' => ['nullable', 'string', 'max:20'],
                 'special_needs_type' => ['nullable', 'string', 'in:'.implode(',', $needs)],
                 'photo' => ['nullable', 'image', 'max:5120'],
-            ])->validate();
+            ] + $this->neuroProfileRules())->validate();
 
             $patient = Patient::findOrFail($validated['id']);
             unset($validated['id']);
@@ -300,5 +344,38 @@ class PatientController extends Controller
             return null;
         }
         return $value;
+    }
+
+    /**
+     * Option lists for the Neurodevelopmental Profile, read from
+     * config('sparisk.neuro_*') so the web form, the mobile app and the API
+     * always offer exactly the same choices.
+     */
+    private function neuroOptions(): array
+    {
+        $options = fn (string $key) => collect(config($key))
+            ->map(fn ($item, $value) => ['value' => $value, 'label' => $item['label']])
+            ->values()
+            ->all();
+
+        return [
+            'neuroProfiles' => $options('sparisk.neuro_profiles'),
+            'neuroConditions' => $options('sparisk.neuro_conditions'),
+        ];
+    }
+
+    /**
+     * Validation rules for the Neurodevelopmental Profile. The allowed options
+     * come from config('sparisk.neuro_*') so the web form, the mobile app and
+     * the API always accept exactly the same values.
+     */
+    private function neuroProfileRules(): array
+    {
+        return [
+            'neuro_profile' => ['nullable', Rule::in(array_keys(config('sparisk.neuro_profiles')))],
+            'neuro_conditions' => 'nullable|array',
+            'neuro_conditions.*' => ['string', Rule::in(array_keys(config('sparisk.neuro_conditions')))],
+            'neuro_conditions_other' => 'nullable|string|max:255',
+        ];
     }
 }

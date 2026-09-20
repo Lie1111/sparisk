@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AssessmentImage;
 use App\Models\Patient;
 use App\Models\PostureAssessment;
+use App\Models\PostureIntervention;
 use App\Services\Sparisk\SpariskAquaticRecommendationEngine;
 use App\Services\Sparisk\SpariskDecisionEngine;
 use App\Services\Sparisk\SpariskInterpretationEngine;
@@ -73,6 +74,8 @@ class PostureAssessmentController extends Controller
             $overallScore = $this->measurementEngine->calculateOverallScore($assessment);
 
             $interpretations = $this->interpretationEngine->interpret($assessment);
+            $symmetry = $this->interpretationEngine->generateSymmetry($assessment);
+            $overallInterpretation = $this->interpretationEngine->generateOverallInterpretation($assessment);
             $primaryFindings = $this->interpretationEngine->generatePrimaryFindings($assessment);
             $clinicalSummary = $this->interpretationEngine->generateClinicalSummary($assessment);
 
@@ -112,10 +115,15 @@ class PostureAssessmentController extends Controller
                 'exerciseRecommendations', 'massageRecommendations', 'weeklyPrograms'
             ]);
 
+            $this->syncInterventionImages($assessment);
+
             return response()->json([
                 'assessment' => $assessment,
                 'decision_result' => $decisionResult,
                 'global_analysis' => $globalAnalysis,
+                'measurements' => $interpretations,
+                'symmetry' => $symmetry,
+                'overall_interpretation' => $overallInterpretation,
             ], 201);
 
         } catch (\Exception $e) {
@@ -150,7 +158,65 @@ class PostureAssessmentController extends Controller
             'reports'
         ]);
 
-        return response()->json($postureAssessment);
+        $this->syncInterventionImages($postureAssessment);
+
+        return response()->json(array_merge($postureAssessment->toArray(), [
+            'measurements' => $this->interpretationEngine->enrichMeasurements($postureAssessment),
+            // User-facing pattern wording, so the app never renders the stored
+            // clinical classification key directly.
+            'classifications' => $this->interpretationEngine->enrichClassifications($postureAssessment),
+            'classification' => $this->interpretationEngine->classificationSummary($postureAssessment),
+            'overall_interpretation' => $this->interpretationEngine->generateOverallInterpretation($postureAssessment),
+        ]));
+    }
+
+    /**
+     * Overlay the current admin image onto an assessment's recommendations.
+     *
+     * Recommendations copy the image when they are generated, so an image
+     * uploaded to Intervention Recommendations afterwards would keep the old
+     * value forever. The admin table is the source of truth, so the image is
+     * re-resolved on every read.
+     */
+    private function syncInterventionImages(PostureAssessment $assessment): void
+    {
+        $postureType = $this->measurementEngine->resolveInterventionPostureType($assessment->posture_classification);
+        $ageGroup = $this->measurementEngine->resolveAgeGroup($assessment->patient?->age);
+
+        // The adolescent band is the authored fallback, so it is applied first
+        // and the assessment's own band is allowed to overwrite it.
+        $bands = $ageGroup === '13-18' ? ['13-18'] : ['13-18', $ageGroup];
+
+        $interventions = PostureIntervention::query()
+            ->where('posture_type', $postureType)
+            ->whereIn('age_group', $bands)
+            ->get(['program', 'title', 'age_group', 'image_path', 'image_url']);
+
+        $images = [];
+
+        foreach ($bands as $band) {
+            foreach ($interventions->where('age_group', $band) as $intervention) {
+                if (!empty($intervention->image_src)) {
+                    $images[$intervention->program . '|' . $intervention->title] = $intervention->image_src;
+                }
+            }
+        }
+
+        foreach ($assessment->exerciseRecommendations as $recommendation) {
+            $image = $images['aquatic_exercise|' . $recommendation->exercise_name] ?? null;
+
+            if ($image !== null) {
+                $recommendation->image_url = $image;
+            }
+        }
+
+        foreach ($assessment->massageRecommendations as $recommendation) {
+            $image = $images['massage_therapy|' . $recommendation->body_area] ?? null;
+
+            if ($image !== null) {
+                $recommendation->image_url = $image;
+            }
+        }
     }
 
     /**

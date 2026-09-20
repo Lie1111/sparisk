@@ -12,6 +12,16 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { PatientForm, usePatientForm } from './partials';
 
+type BmiResult = {
+    valid: boolean;
+    bmi: number | null;
+    bmi_display: string | null;
+    category: string | null;
+    age_group_label: string | null;
+    reference_label: string | null;
+    source: string | null;
+};
+
 type PatientDetail = {
     id: number;
     name: string;
@@ -25,13 +35,27 @@ type PatientDetail = {
     emergency_contact_name: string | null;
     emergency_contact_phone: string | null;
     special_needs_type: string | null;
+    neuro_profile: string | null;
+    neuro_profile_label: string | null;
+    neuro_conditions: string[];
+    neuro_condition_labels: string[];
+    neuro_conditions_other: string | null;
+    bmi: BmiResult | null;
     posture_assessments: any[];
     health_screenings: any[];
     updated_at: string;
     created_at: string;
 };
 
-export default function Show({ patient }: { patient: PatientDetail }) {
+export default function Show({
+    patient,
+    neuroProfiles = [],
+    neuroConditions = [],
+}: {
+    patient: PatientDetail;
+    neuroProfiles?: { value: string; label: string }[];
+    neuroConditions?: { value: string; label: string }[];
+}) {
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [openEditDialog, setOpenEditDialog] = useState(false);
     const [openScreenings, setOpenScreenings] = useState(false);
@@ -127,6 +151,25 @@ export default function Show({ patient }: { patient: PatientDetail }) {
                             <div>
                                 <div className="text-xs text-muted-foreground">Weight</div>
                                 <div className="font-medium">{patient.weight ? `${patient.weight} kg` : '-'}</div>
+                            </div>
+                            <div>
+                                <div className="text-xs text-muted-foreground">BMI</div>
+                                <div className="font-medium">
+                                    {patient.bmi?.valid ? patient.bmi.bmi_display : '-'}
+                                </div>
+                                {patient.bmi?.valid && patient.bmi.reference_label && (
+                                    <div className="text-xs text-muted-foreground">
+                                        {[patient.bmi.age_group_label, patient.bmi.reference_label].filter(Boolean).join(' • ')}
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <div className="text-xs text-muted-foreground">BMI Category</div>
+                                <div className="font-medium">
+                                    {patient.bmi?.valid && patient.bmi.category ? (
+                                        <Badge variant="secondary">{patient.bmi.category}</Badge>
+                                    ) : '-'}
+                                </div>
                             </div>
                             <div>
                                 <div className="text-xs text-muted-foreground">State</div>
@@ -274,7 +317,15 @@ export default function Show({ patient }: { patient: PatientDetail }) {
                         setConfirmForm={handleConfirmUpdate}
                         title="Update Patient"
                         confirmLabel="Update"
-                        forms={<PatientForm data={patientForm.data} setData={patientForm.setData as any} errors={patientForm.errors as any} />}
+                        forms={
+                            <PatientForm
+                                data={patientForm.data}
+                                setData={patientForm.setData as any}
+                                errors={patientForm.errors as any}
+                                neuroProfiles={neuroProfiles}
+                                neuroConditions={neuroConditions}
+                            />
+                        }
                         processing={patientForm.processing}
                     />
                 )}

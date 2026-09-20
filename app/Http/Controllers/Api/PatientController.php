@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
+use App\Services\Sparisk\SpariskBmiEngine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -11,6 +12,8 @@ use Illuminate\Validation\Rule;
 
 class PatientController extends Controller
 {
+    public function __construct(private SpariskBmiEngine $bmiEngine) {}
+
     public function index(Request $request): JsonResponse
     {
         $query = Patient::query();
@@ -54,7 +57,7 @@ class PatientController extends Controller
                 'autism', 'adhd', 'cerebral_palsy', 'down_syndrome',
                 'developmental_delay', 'other', 'none'
             ])],
-        ]);
+        ] + $this->neuroProfileRules());
 
         if ($request->hasFile('photo')) {
             $validated['photo'] = $request->file('photo')->store('patients', 'public');
@@ -73,7 +76,9 @@ class PatientController extends Controller
             $q->latest('assessment_date')->limit(10);
         }]);
 
-        return response()->json($patient);
+        return response()->json(array_merge($patient->toArray(), [
+            'bmi' => $this->bmiEngine->forPatient($patient),
+        ]));
     }
 
     public function update(Request $request, Patient $patient): JsonResponse
@@ -93,7 +98,7 @@ class PatientController extends Controller
                 'autism', 'adhd', 'cerebral_palsy', 'down_syndrome',
                 'developmental_delay', 'other', 'none'
             ])],
-        ]);
+        ] + $this->neuroProfileRules());
 
         if ($request->hasFile('photo')) {
             if ($patient->photo) {
@@ -122,5 +127,20 @@ class PatientController extends Controller
             ->get();
 
         return response()->json($assessments);
+    }
+
+    /**
+     * Validation rules for the Neurodevelopmental Profile. The allowed options
+     * come from config('sparisk.neuro_*') so the app, the web form and the API
+     * always accept exactly the same values.
+     */
+    private function neuroProfileRules(): array
+    {
+        return [
+            'neuro_profile' => ['nullable', Rule::in(array_keys(config('sparisk.neuro_profiles')))],
+            'neuro_conditions' => 'nullable|array',
+            'neuro_conditions.*' => ['string', Rule::in(array_keys(config('sparisk.neuro_conditions')))],
+            'neuro_conditions_other' => 'nullable|string|max:255',
+        ];
     }
 }

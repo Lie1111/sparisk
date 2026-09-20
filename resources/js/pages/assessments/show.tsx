@@ -19,18 +19,45 @@ const viewLabels: Record<string, string> = {
     right_side: 'Right Side (C)', left_side: 'Left Side (D)',
 }
 
-const severityColor = (s: string) => {
-    switch (s) {
-        case 'severe': return 'text-red-500 bg-red-50'
-        case 'moderate': return 'text-orange-500 bg-orange-50'
-        case 'mild': return 'text-yellow-500 bg-yellow-50'
-        default: return 'text-green-500 bg-green-50'
-    }
+// User-facing alignment wording. The backend sends `alignment_label`, but the
+// map keeps stored measurements (which only carry the band) rendering the same
+// wording as interpreted ones.
+const alignmentLabels: Record<string, string> = {
+    normal: 'On Point',
+    mild: 'Slightly Off Point',
+    moderate: 'Off Point',
+    severe: 'Far Off Point',
+    review: 'Check Measurement',
 }
 
-export default function AssessmentShow({ assessment, viewMeasurements }: any) {
+const alignmentStyles: Record<string, string> = {
+    normal: 'text-green-600 bg-green-50',
+    mild: 'text-yellow-600 bg-yellow-50',
+    moderate: 'text-orange-600 bg-orange-50',
+    severe: 'text-red-600 bg-red-50',
+    review: 'text-slate-500 bg-slate-100',
+}
+
+const alignmentStatusOf = (m: any) => {
+    if (m?.review_required) return 'review'
+    const status = (m?.alignment_status || m?.severity || 'normal').toLowerCase()
+    return alignmentLabels[status] ? status : 'normal'
+}
+
+const alignmentLabelOf = (m: any) =>
+    m?.alignment_label || alignmentLabels[alignmentStatusOf(m)] || 'On Point'
+
+const humanize = (value?: string) =>
+    (value || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
+export default function AssessmentShow({ assessment, viewMeasurements, classification }: any) {
     const patient = assessment.patient
-    const classifications = assessment.classifications || []
+    // The classification summary carries the user-facing pattern wording, so its
+    // enriched rows are preferred over the raw clinical keys on the model.
+    const classificationInfo = classification || {}
+    const classifications = classificationInfo.classifications?.length
+        ? classificationInfo.classifications
+        : (assessment.classifications || [])
     const exercises = assessment.exercise_recommendations || []
     const massages = assessment.massage_recommendations || []
     const programs = assessment.weekly_programs || []
@@ -42,6 +69,12 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
         monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed',
         thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun',
     }
+
+    // An unclassified posture must never be shown as a diagnosis.
+    const isUnclassified = classificationInfo.review_required === true
+    const classificationDisplay = classificationInfo.display
+        ? (isUnclassified ? classificationInfo.display : humanize(classificationInfo.display))
+        : 'Not yet classified'
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -77,7 +110,14 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
                             <Target className="h-10 w-10 text-primary" />
                             <div>
                                 <p className="text-sm text-muted-foreground">Classification</p>
-                                <p className="font-semibold">{assessment.posture_classification || 'Normal'}</p>
+                                <p className={`font-semibold ${isUnclassified ? 'text-orange-600' : ''}`}>
+                                    {classificationDisplay}
+                                </p>
+                                {(classificationInfo.confidence_label || classificationInfo.confidence_level) && (
+                                    <p className="text-xs text-muted-foreground">
+                                        {classificationInfo.confidence_label || `${classificationInfo.confidence_level} confidence`}
+                                    </p>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
@@ -113,22 +153,31 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
                                         {(measurements || []).length === 0 ? (
                                             <p className="text-sm text-muted-foreground">No measurements</p>
                                         ) : (
-                                            (measurements || []).map((m: any) => (
-                                                <div key={m.id} className="flex items-center justify-between border-b pb-1">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-xs text-muted-foreground w-6">{m.section}</span>
-                                                        <span className="text-sm">{m.label}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-sm font-medium">{m.value?.toFixed(1)}°</span>
-                                                        {m.severity && m.severity !== 'normal' && (
-                                                            <Badge className={`text-[10px] px-1.5 ${severityColor(m.severity)}`}>
-                                                                {m.severity}
-                                                            </Badge>
+                                            (measurements || []).map((m: any) => {
+                                                const status = alignmentStatusOf(m)
+                                                const note = m.position_note || (status === 'review' ? m.interpretation : '')
+                                                return (
+                                                    <div key={m.id} className="border-b pb-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-xs text-muted-foreground w-6">{m.section}</span>
+                                                                <span className="text-sm">{m.label}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium">{m.value?.toFixed(1)}°</span>
+                                                                {status !== 'normal' && (
+                                                                    <Badge className={`text-[10px] px-1.5 ${alignmentStyles[status]}`}>
+                                                                        {alignmentLabelOf(m)}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        {note && (
+                                                            <p className="pl-9 text-xs text-muted-foreground">{note}</p>
                                                         )}
                                                     </div>
-                                                </div>
-                                            ))
+                                                )
+                                            })
                                         )}
                                     </CardContent>
                                 </Card>
@@ -137,6 +186,59 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
                     </TabsContent>
 
                     <TabsContent value="classification" className="mt-4 space-y-4">
+                        {isUnclassified && (
+                            <Card className="border-orange-200 bg-orange-50/50">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-base text-orange-700">
+                                        <Info className="h-4 w-4" />
+                                        {classificationDisplay}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2 text-sm">
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        <div className="flex justify-between gap-2">
+                                            <span className="text-muted-foreground">Review Status</span>
+                                            <span className="font-medium">Measurement Review Required</span>
+                                        </div>
+                                        {classificationInfo.suspected_pattern && (
+                                            <div className="flex justify-between gap-2">
+                                                <span className="text-muted-foreground">Main Finding</span>
+                                                <span className="font-medium">
+                                                    {classificationInfo.suspected_pattern_label
+                                                        || `Possible ${humanize(classificationInfo.suspected_pattern)} Pattern`}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {classificationInfo.secondary_pattern && (
+                                            <div className="flex justify-between gap-2">
+                                                <span className="text-muted-foreground">Secondary Finding</span>
+                                                <span className="font-medium">
+                                                    {classificationInfo.secondary_pattern_label
+                                                        || humanize(classificationInfo.secondary_pattern)}
+                                                </span>
+                                            </div>
+                                        )}
+                                        <div className="flex justify-between gap-2">
+                                            <span className="text-muted-foreground">Asymmetry</span>
+                                            <span className="font-medium">{classificationInfo.asymmetry_flag ? 'Detected' : 'Not detected'}</span>
+                                        </div>
+                                        {(classificationInfo.confidence_label || classificationInfo.confidence_level) && (
+                                            <div className="flex justify-between gap-2">
+                                                <span className="text-muted-foreground">Confidence</span>
+                                                <span className="font-medium">
+                                                    {classificationInfo.confidence_label || classificationInfo.confidence_level}
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <p className="text-muted-foreground">
+                                        The measurements currently available are not sufficient to confirm a posture type.
+                                        No Swayback, Lordosis or Kyphosis diagnosis has been made.
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {classifications.length === 0 ? (
                             <Card><CardContent className="py-8 text-center text-muted-foreground">No classifications</CardContent></Card>
                         ) : (
@@ -147,11 +249,17 @@ export default function AssessmentShow({ assessment, viewMeasurements }: any) {
                                             {c.classification_type}
                                         </Badge>
                                         <div className="flex-1">
-                                            <p className="font-semibold">{c.classification_name?.replace(/_/g, ' ')}</p>
+                                            <p className="font-semibold">
+                                                {c.classification_label || humanize(c.classification_name)}
+                                            </p>
                                             {c.description && <p className="text-sm text-muted-foreground">{c.description}</p>}
                                         </div>
                                         <div className="text-right">
-                                            <Badge className={severityColor(c.severity)}>{c.severity}</Badge>
+                                            {(c.alignment_status || c.severity) && (
+                                                <Badge className={alignmentStyles[alignmentStatusOf(c)]}>
+                                                    {alignmentLabelOf(c)}
+                                                </Badge>
+                                            )}
                                             {c.confidence && (
                                                 <p className="text-xs text-muted-foreground mt-1">{c.confidence}% confidence</p>
                                             )}

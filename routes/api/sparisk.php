@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AcademyController;
+use App\Http\Controllers\Api\BmiController;
 use App\Http\Controllers\Api\HealthScreeningController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PostureAssessmentController;
@@ -22,6 +23,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Patients
     Route::apiResource('patients', PatientController::class);
     Route::get('patients/{patient}/assessments', [PatientController::class, 'assessments']);
+
+    // BMI - central SATA age + gender classification
+    Route::post('bmi/calculate', [BmiController::class, 'calculate']);
+    Route::get('patients/{patient}/bmi', [BmiController::class, 'forPatient']);
 
     // Health Screenings
     Route::get('patients/{patient}/health-screenings', [HealthScreeningController::class, 'index']);

@@ -4,13 +4,96 @@ namespace App\Services\Sparisk;
 
 use App\Models\MassageRecommendation;
 use App\Models\PostureAssessment;
+use App\Models\PostureIntervention;
 
 class SpariskMassageRecommendationEngine
 {
     /**
-     * Generate massage recommendations based on assessment classification.
+     * Program slug shared with config('sparisk.intervention_programs').
+     */
+    public const PROGRAM = 'massage_therapy';
+
+    public function __construct(private SpariskMeasurementEngine $measurements) {}
+
+    /**
+     * Generate massage therapy recommendations for an assessment.
+     *
+     * Mirrors the aquatic engine: the admin-authored CADANGAN INTERVENSI rows
+     * win, and their image, frequency and instructions are copied onto the
+     * recommendation so the app can show the plan the admin built.
      */
     public function recommend(PostureAssessment $assessment): array
+    {
+        $interventions = $this->adminInterventions($assessment);
+
+        if ($interventions->isNotEmpty()) {
+            return $this->copyFromAdmin($assessment, $interventions);
+        }
+
+        return $this->fromConfig($assessment);
+    }
+
+    /**
+     * Admin rows for this assessment's posture type and age band, in the order
+     * the admin arranged them.
+     */
+    private function adminInterventions(PostureAssessment $assessment)
+    {
+        $postureType = $this->measurements->resolveInterventionPostureType($assessment->posture_classification);
+
+        $ageGroup = $this->measurements->resolveAgeGroup($assessment->patient?->age);
+
+        $query = fn (string $age) => PostureIntervention::query()
+            ->where('program', self::PROGRAM)
+            ->where('posture_type', $postureType)
+            ->where('age_group', $age)
+            ->orderBy('order_index')
+            ->orderBy('id')
+            ->get();
+
+        $interventions = $query($ageGroup);
+
+        // The catalogue is normally authored for the adolescent band, so an
+        // adult assessment would otherwise miss the admin's work entirely.
+        if ($interventions->isEmpty() && $ageGroup !== '13-18') {
+            $interventions = $query('13-18');
+        }
+
+        return $interventions;
+    }
+
+    /**
+     * Build one recommendation per admin entry, carrying the image across.
+     *
+     * @param  \Illuminate\Support\Collection<int, PostureIntervention>  $interventions
+     */
+    private function copyFromAdmin(PostureAssessment $assessment, $interventions): array
+    {
+        $recommendations = [];
+
+        foreach ($interventions as $orderIndex => $intervention) {
+            $recommendations[] = MassageRecommendation::create([
+                'posture_assessment_id' => $assessment->id,
+                'body_area' => $intervention->title,
+                'program' => self::PROGRAM,
+                'priority_stars' => 3,
+                'instructions' => $intervention->description
+                    ?: $this->getMassageInstructions($intervention->title),
+                'duration_minutes' => $intervention->duration_minutes,
+                'frequency' => $intervention->frequency,
+                'image_url' => $intervention->image_src,
+                'safety_notes' => $this->getSafetyNotes($intervention->title),
+                'order_index' => $orderIndex,
+            ]);
+        }
+
+        return $recommendations;
+    }
+
+    /**
+     * Built-in defaults, used when the admin catalogue is empty.
+     */
+    private function fromConfig(PostureAssessment $assessment): array
     {
         $classification = $assessment->posture_classification ?? 'default';
         $massages = config("sparisk.massage_recommendations.{$classification}")
@@ -23,6 +106,7 @@ class SpariskMassageRecommendationEngine
             $rec = MassageRecommendation::create([
                 'posture_assessment_id' => $assessment->id,
                 'body_area' => $massage['area'],
+                'program' => self::PROGRAM,
                 'priority_stars' => $massage['stars'],
                 'instructions' => $this->getMassageInstructions($massage['area']),
                 'duration_minutes' => $massage['duration'],

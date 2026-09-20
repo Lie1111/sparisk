@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\PostureAssessment;
+use App\Models\PostureMeasurement;
 use App\Models\Report;
+use App\Services\Sparisk\SpariskInterpretationEngine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
 {
+    public function __construct(private SpariskInterpretationEngine $interpretationEngine) {}
+
     /**
      * Generate a report for an assessment.
      */
@@ -68,11 +72,24 @@ class ReportController extends Controller
      */
     private function buildReportData(PostureAssessment $assessment, string $type): array
     {
+        $interpreted = collect($this->interpretationEngine->interpret($assessment))->keyBy('section');
+
         $viewMeasurements = [];
         foreach (['front', 'back', 'right_side', 'left_side'] as $view) {
             $viewMeasurements[$view] = $assessment->measurements
                 ->where('view', $view)
                 ->values()
+                ->map(function (PostureMeasurement $measurement) use ($interpreted) {
+                    $details = $interpreted->get($measurement->section);
+
+                    return array_merge($measurement->toArray(), [
+                        'alignment_label' => $details['alignment_label'] ?? null,
+                        'alignment_color' => $details['alignment_color'] ?? null,
+                        'position_note' => $details['position_note'] ?? null,
+                        'interpretation' => $details['interpretation'] ?? $measurement->status_text,
+                        'review_required' => (bool) $measurement->review_required,
+                    ]);
+                })
                 ->toArray();
         }
 
@@ -116,9 +133,19 @@ class ReportController extends Controller
             ]),
             'measurements_by_view' => $viewMeasurements,
             'posture_classification' => [
-                'primary' => $assessment->posture_classification,
+                'primary' => $assessment->posture_classification === config('sparisk.unclassified.code')
+                    ? config('sparisk.unclassified.display')
+                    : $assessment->posture_classification,
+                'code' => $assessment->posture_classification,
+                'review_status' => $assessment->review_status,
+                'suspected_pattern' => $assessment->suspected_pattern,
+                'secondary_pattern' => $assessment->secondary_pattern,
+                'asymmetry_flag' => (bool) $assessment->asymmetry_flag,
+                'confidence_level' => $assessment->confidence_level,
                 'details' => $assessment->classifications->toArray(),
             ],
+            'symmetry' => $this->interpretationEngine->generateSymmetry($assessment),
+            'overall_interpretation' => $this->interpretationEngine->generateOverallInterpretation($assessment),
             'primary_findings' => $assessment->primary_findings ? json_decode($assessment->primary_findings, true) : [],
             'clinical_interpretation' => $assessment->clinical_summary,
             'aquatic_recommendations' => $exercises,

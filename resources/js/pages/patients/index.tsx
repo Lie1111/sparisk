@@ -12,7 +12,17 @@ import { PlusCircle } from 'lucide-react';
 
 import { buildActions, buildColumns, PatientForm, usePatientForm, type Patient } from './partials';
 
-export default function Index({ patients, query }: { patients: any; query: string }) {
+export default function Index({
+    patients,
+    query,
+    neuroProfiles = [],
+    neuroConditions = [],
+}: {
+    patients: any;
+    query: string;
+    neuroProfiles?: { value: string; label: string }[];
+    neuroConditions?: { value: string; label: string }[];
+}) {
     const [openForm, setOpenForm] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [formType, setFormType] = useState<'create' | 'update'>('create');
@@ -142,7 +152,15 @@ export default function Index({ patients, query }: { patients: any; query: strin
                         setConfirmForm={handleConfirm}
                         title={`${formType === 'create' ? 'Register' : 'Update'} Patient`}
                         confirmLabel={formType === 'create' ? 'Create' : 'Update'}
-                        forms={<PatientForm data={data} setData={setData as any} errors={errors as any} />}
+                        forms={
+                            <PatientForm
+                                data={data}
+                                setData={setData as any}
+                                errors={errors as any}
+                                neuroProfiles={neuroProfiles}
+                                neuroConditions={neuroConditions}
+                            />
+                        }
                         processing={processing}
                     />
                 )}

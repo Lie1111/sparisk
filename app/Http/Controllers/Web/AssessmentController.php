@@ -5,13 +5,15 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\AssessmentImage;
 use App\Models\PostureAssessment;
-use App\Models\PostureMeasurement;
+use App\Services\Sparisk\SpariskInterpretationEngine;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class AssessmentController extends Controller
 {
+    public function __construct(private SpariskInterpretationEngine $interpretationEngine) {}
+
     public function show(PostureAssessment $postureAssessment)
     {
         $postureAssessment->load([
@@ -26,16 +28,12 @@ class AssessmentController extends Controller
             'reports'
         ]);
 
-        $viewMeasurements = [];
-        foreach (['front', 'back', 'right_side', 'left_side'] as $view) {
-            $viewMeasurements[$view] = $postureAssessment->measurements
-                ->where('view', $view)
-                ->values();
-        }
+        $viewMeasurements = $this->interpretationEngine->measurementsByView($postureAssessment);
 
         return Inertia::render('assessments/show', [
             'assessment' => $postureAssessment,
             'viewMeasurements' => $viewMeasurements,
+            'classification' => $this->interpretationEngine->classificationSummary($postureAssessment),
         ]);
     }
 
@@ -131,9 +129,9 @@ class AssessmentController extends Controller
         $h .= '<h2>Measurements by View</h2>';
         foreach ($viewMeasurements as $view => $measurements) {
             $h .= '<h3>' . e($viewLabels[$view] ?? $view) . '</h3><table>';
-            $h .= '<tr><th style="width:12%">Code</th><th>Parameter</th><th style="width:15%">Value</th><th>Severity</th></tr>';
+            $h .= '<tr><th style="width:12%">Code</th><th>Parameter</th><th style="width:15%">Value</th><th>Alignment Status</th><th>Position Note</th></tr>';
             if ($measurements->isEmpty()) {
-                $h .= '<tr><td colspan="4">No measurements</td></tr>';
+                $h .= '<tr><td colspan="5">No measurements</td></tr>';
             } else {
                 foreach ($measurements as $m) {
                     $label = $m->label;
@@ -141,11 +139,17 @@ class AssessmentController extends Controller
                         $def = config('sparisk.measurements.' . $m->section);
                         $label = $def['label'] ?? $m->section;
                     }
+                    $status = $m->review_required ? 'review' : ($m->alignment_status ?? $m->severity ?? 'normal');
+                    $meta = config("sparisk.alignment_statuses.{$status}", config('sparisk.alignment_statuses.normal'));
+                    $col = $this->alignmentHex($meta['color']);
+                    $note = $m->review_required
+                        ? config('sparisk.alignment_status_descriptions.review')
+                        : ($m->position_note ?? '');
+
                     $h .= '<tr><td>' . e($m->section) . '</td><td>' . e($label) . '</td>';
                     $h .= '<td>' . e((string) number_format((float) $m->value, 1)) . '°</td>';
-                    $sev = $m->severity ?? '';
-                    $col = $sev === 'severe' ? '#dc2626' : ($sev === 'moderate' ? '#ea580c' : ($sev === 'mild' ? '#ca8a04' : '#16a34a'));
-                    $h .= '<td style="color:' . $col . '">' . e($sev ? strtoupper($sev) : 'NORMAL') . '</td></tr>';
+                    $h .= '<td style="color:' . $col . '">' . e($meta['label']) . '</td>';
+                    $h .= '<td>' . e($note) . '</td></tr>';
                 }
             }
             $h .= '</table>';
@@ -153,14 +157,38 @@ class AssessmentController extends Controller
 
         // Classification
         $h .= '<h2>Posture Classification</h2>';
-        if ($a->classifications->isEmpty()) {
-            $h .= '<p class="muted">No classifications</p>';
-        } else {
+        $classification = $this->interpretationEngine->classificationSummary($a);
+        if ($classification['review_required']) {
+            $h .= '<p><strong>' . e($classification['display']) . '</strong></p>';
             $h .= '<ul>';
-            foreach ($a->classifications as $c) {
-                $h .= '<li><strong>' . e(str_replace('_', ' ', $c->classification_name)) . '</strong>'
-                    . ($c->description ? ' — ' . e($c->description) : '')
-                    . ' <span class="muted">[' . e($c->classification_type) . ' · ' . e($c->severity) . ']</span></li>';
+            if ($classification['review_status']) {
+                $h .= '<li>Review status: <strong>Measurement Review Required</strong></li>';
+            }
+            if ($classification['suspected_pattern']) {
+                $h .= '<li>Main finding: ' . e($classification['suspected_pattern_label']
+                    ?? 'Possible ' . str_replace('_', ' ', $classification['suspected_pattern']) . ' pattern') . '</li>';
+            }
+            if ($classification['secondary_pattern']) {
+                $h .= '<li>Secondary finding: ' . e($classification['secondary_pattern_label']
+                    ?? str_replace('_', ' ', $classification['secondary_pattern'])) . '</li>';
+            }
+            $h .= '<li>Asymmetry: ' . ($classification['asymmetry_flag'] ? 'Detected' : 'Not detected') . '</li>';
+            if ($classification['confidence_level']) {
+                $h .= '<li>Confidence: ' . e($classification['confidence_label'] ?? $classification['confidence_level']) . '</li>';
+            }
+            $h .= '</ul>';
+            $h .= '<p class="muted">The measurements currently available are not sufficient to confirm a posture type. No Swayback, Lordosis or Kyphosis diagnosis has been made.</p>';
+        } else {
+            $h .= '<p><strong>' . e($classification['display']) . '</strong></p>';
+        }
+
+        if ($a->classifications->isNotEmpty()) {
+            $h .= '<ul>';
+            foreach ($classification['classifications'] as $c) {
+                $h .= '<li><strong>' . e($c['classification_label'] ?? str_replace('_', ' ', $c['classification_name'])) . '</strong>'
+                    . (!empty($c['description']) ? ' — ' . e($c['description']) : '')
+                    . (!empty($c['alignment_label']) ? ' <span class="muted">[' . e($c['alignment_label']) . ']</span>' : '')
+                    . ' <span class="muted">[' . e($c['classification_type']) . ']</span></li>';
             }
             $h .= '</ul>';
         }
@@ -223,6 +251,20 @@ class AssessmentController extends Controller
         $h .= '</body></html>';
 
         return $h;
+    }
+
+    /**
+     * Hex colour for an alignment status band name, used by the Word export.
+     */
+    private function alignmentHex(string $color): string
+    {
+        return match ($color) {
+            'yellow' => '#ca8a04',
+            'orange' => '#ea580c',
+            'red' => '#dc2626',
+            'grey' => '#64748b',
+            default => '#16a34a',
+        };
     }
 
     public function storeCapture(Request $request, PostureAssessment $postureAssessment)

@@ -11,7 +11,9 @@ class PostureAssessment extends Model
     protected $fillable = [
         'patient_id', 'health_screening_id', 'assessment_date',
         'time_mark', 'overall_score', 'overall_status',
-        'posture_classification', 'clinical_summary',
+        'posture_classification', 'review_status',
+        'suspected_pattern', 'secondary_pattern', 'asymmetry_flag',
+        'confidence_level', 'clinical_summary',
         'primary_findings', 'need_attention', 'biggest_improvement',
         'overall_progress'
     ];
@@ -19,6 +21,7 @@ class PostureAssessment extends Model
     protected $casts = [
         'assessment_date' => 'date',
         'overall_score' => 'integer',
+        'asymmetry_flag' => 'boolean',
     ];
 
     public function patient(): BelongsTo
