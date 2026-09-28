@@ -5,4 +5,5 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/assessments/{postureAssessment}', [AssessmentController::class, 'show'])->name('assessments.show');
 Route::get('/assessments/{postureAssessment}/word', [AssessmentController::class, 'generateWord'])->name('assessments.word');
+Route::get('/assessments/{postureAssessment}/pdf', [AssessmentController::class, 'generatePdf'])->name('assessments.pdf');
 Route::post('/assessments/{postureAssessment}/capture', [AssessmentController::class, 'storeCapture'])->name('assessments.capture');

@@ -15,8 +15,8 @@ class SpariskMeasurementEngine
      * Each measured value is validated and angle-normalised before it is
      * compared against the SATA age-based reference for the patient's age
      * group. The signed deviation is mapped to a fixed SATA severity band and
-     * to a user-facing alignment status (On Point / Slightly Off Point /
-     * Off Point / Far Off Point / Check Measurement).
+     * to a user-facing alignment status (Aligned / Slightly Misaligned /
+     * Misaligned / Clearly Misaligned / Check Measurement).
      *
      * Measurements that cannot be trusted (missing landmark, impossible angle,
      * missing reference) are stored with `alignment_status = review` and

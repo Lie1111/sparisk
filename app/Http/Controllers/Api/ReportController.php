@@ -7,8 +7,10 @@ use App\Models\PostureAssessment;
 use App\Models\PostureMeasurement;
 use App\Models\Report;
 use App\Services\Sparisk\SpariskInterpretationEngine;
+use App\Services\Sparisk\SpariskReportPdfService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class ReportController extends Controller
 {
@@ -42,6 +44,15 @@ class ReportController extends Controller
             'report' => $report,
             'data' => $reportData,
         ]);
+    }
+
+    /**
+     * Download the branded PDF report for an assessment. This is the same
+     * document the admin panel serves, so the app no longer builds it locally.
+     */
+    public function pdf(PostureAssessment $postureAssessment, SpariskReportPdfService $pdf): Response
+    {
+        return $pdf->download($postureAssessment);
     }
 
     /**

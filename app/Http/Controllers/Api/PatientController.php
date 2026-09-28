@@ -72,9 +72,14 @@ class PatientController extends Controller
 
     public function show(Patient $patient): JsonResponse
     {
-        $patient->load(['healthScreenings', 'postureAssessments' => function ($q) {
-            $q->latest('assessment_date')->limit(10);
-        }]);
+        $patient->load([
+            'healthScreenings' => function ($q) {
+                $q->latest('created_at');
+            },
+            'postureAssessments' => function ($q) {
+                $q->latest('assessment_date')->limit(10);
+            },
+        ]);
 
         return response()->json(array_merge($patient->toArray(), [
             'bmi' => $this->bmiEngine->forPatient($patient),

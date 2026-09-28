@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type BreadcrumbItem } from '@/types';
-import { ArrowLeft, Pencil, Trash2, Activity, ClipboardList, FileText, Eye, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, Activity, ClipboardList, FileText, Eye, ChevronDown, Download } from 'lucide-react';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormDialog } from '@/components/form-dialog';
 import { useState } from 'react';
@@ -236,6 +236,13 @@ export default function Show({
                                                     </div>
                                                 </Link>
                                                 <div className="flex shrink-0 items-center gap-2">
+                                                    <a
+                                                        href={`/assessments/${a.id}/pdf`}
+                                                        className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted/50"
+                                                    >
+                                                        <Download className="h-3.5 w-3.5" />
+                                                        PDF
+                                                    </a>
                                                     <a
                                                         href={`/assessments/${a.id}/word`}
                                                         className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted/50"

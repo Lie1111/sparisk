@@ -175,7 +175,7 @@ export default function TableWithPagination({
         <>
             <div className="flex items-center mb-2">
                 <div className="ml-auto flex items-center gap-2">
-                    {onAdd && addPermission && permissions.includes(addPermission) && (
+                    {onAdd && (!addPermission || permissions.includes(addPermission)) && (
                         <Button
                             size="sm"
                             className="h-8 gap-1"

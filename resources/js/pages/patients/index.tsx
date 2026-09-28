@@ -3,12 +3,10 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormDialog } from '@/components/form-dialog';
 import TableWithPagination from '@/components/table-with-pagination';
 import { type BreadcrumbItem } from '@/types';
-import { PlusCircle } from 'lucide-react';
 
 import { buildActions, buildColumns, PatientForm, usePatientForm, type Patient } from './partials';
 
@@ -119,13 +117,6 @@ export default function Index({
             <Head title="Patients" />
 
             <main className="flex-1 items-start gap-4 p-4 mt-4 sm:px-6 sm:py-0 md:gap-8">
-                <div className="mb-4 flex items-center justify-end">
-                    <Button size="sm" className="h-8 gap-1" onClick={handleAdd}>
-                        <PlusCircle className="h-3.5 w-3.5" />
-                        <span className="sm:whitespace-nowrap">Register Patient</span>
-                    </Button>
-                </div>
-
                 <TableWithPagination
                     title="Patients"
                     description="Create, view, update, and delete patients."
@@ -143,6 +134,7 @@ export default function Index({
                     actions={actions as any}
                     onSearch={handleSearch}
                     onPageChange={handlePageChange}
+                    onAdd={handleAdd}
                 />
 
                 {openForm && (

@@ -17,47 +17,49 @@ class PostureMarkerSeeder extends Seeder
     public function run(): void
     {
         // [view, type, muscle, label, x, y, width, height]
+        // x / y are the NORMALIZED CENTRE of the shape and were measured
+        // against the transparent silhouette of the character PNGs.
         $markers = [
             // ---- Front view ----
-            ['front', 'tight', 'Upper Trapezius / SCM', 'Neck / SCM', 0.50, 0.135, 0.16, 0.13],
-            ['front', 'tight', 'Pectoralis Major (Left)', 'Chest L', 0.37, 0.295, 0.18, 0.15],
-            ['front', 'tight', 'Pectoralis Major (Right)', 'Chest R', 0.63, 0.295, 0.18, 0.15],
-            ['front', 'tight', 'Biceps Brachii (Left)', 'Biceps L', 0.175, 0.38, 0.11, 0.24],
-            ['front', 'tight', 'Biceps Brachii (Right)', 'Biceps R', 0.825, 0.38, 0.11, 0.24],
-            ['front', 'weak', 'Core Muscles (Deep Abdominals)', 'Core', 0.50, 0.50, 0.20, 0.20],
-            ['front', 'tight', 'Rectus Femoris / Hip Flexors (Left)', 'Thigh L', 0.39, 0.695, 0.18, 0.19],
-            ['front', 'tight', 'Rectus Femoris / Hip Flexors (Right)', 'Thigh R', 0.61, 0.695, 0.18, 0.19],
-            ['front', 'tight', 'Gastrocnemius (Left)', 'Calf L', 0.39, 0.875, 0.16, 0.17],
-            ['front', 'tight', 'Gastrocnemius (Right)', 'Calf R', 0.61, 0.875, 0.16, 0.17],
+            ['front', 'tight', 'Upper Trapezius / SCM', 'Neck / SCM', 0.495, 0.155, 0.160, 0.110],
+            ['front', 'tight', 'Pectoralis Major (Left)', 'Chest L', 0.415, 0.285, 0.150, 0.120],
+            ['front', 'tight', 'Pectoralis Major (Right)', 'Chest R', 0.585, 0.285, 0.150, 0.120],
+            ['front', 'tight', 'Biceps Brachii (Left)', 'Biceps L', 0.225, 0.375, 0.095, 0.170],
+            ['front', 'tight', 'Biceps Brachii (Right)', 'Biceps R', 0.775, 0.375, 0.095, 0.170],
+            ['front', 'weak', 'Core Muscles (Deep Abdominals)', 'Core', 0.500, 0.430, 0.200, 0.120],
+            ['front', 'tight', 'Rectus Femoris / Hip Flexors (Left)', 'Thigh L', 0.385, 0.625, 0.140, 0.145],
+            ['front', 'tight', 'Rectus Femoris / Hip Flexors (Right)', 'Thigh R', 0.615, 0.625, 0.140, 0.145],
+            ['front', 'tight', 'Gastrocnemius (Left)', 'Calf L', 0.382, 0.790, 0.085, 0.080],
+            ['front', 'tight', 'Gastrocnemius (Right)', 'Calf R', 0.618, 0.790, 0.085, 0.080],
 
             // ---- Back view ----
-            ['back', 'tight', 'Upper Trapezius / Levator Scapulae', 'Upper Trap', 0.50, 0.17, 0.24, 0.14],
-            ['back', 'tight', 'Rhomboids', 'Rhomboids', 0.50, 0.28, 0.40, 0.16],
-            ['back', 'weak', 'Latissimus Dorsi (Left)', 'Lat L', 0.31, 0.39, 0.14, 0.22],
-            ['back', 'weak', 'Latissimus Dorsi (Right)', 'Lat R', 0.69, 0.39, 0.14, 0.22],
-            ['back', 'tight', 'Erector Spinae', 'Erector Spinae', 0.50, 0.54, 0.12, 0.24],
-            ['back', 'tight', 'Hamstrings (Left)', 'Hamstring L', 0.39, 0.695, 0.18, 0.19],
-            ['back', 'tight', 'Hamstrings (Right)', 'Hamstring R', 0.61, 0.695, 0.18, 0.19],
-            ['back', 'tight', 'Gastrocnemius (Left)', 'Calf L', 0.39, 0.875, 0.16, 0.17],
-            ['back', 'tight', 'Gastrocnemius (Right)', 'Calf R', 0.61, 0.875, 0.16, 0.17],
+            ['back', 'tight', 'Upper Trapezius / Levator Scapulae', 'Upper Trap', 0.500, 0.215, 0.260, 0.090],
+            ['back', 'tight', 'Rhomboids', 'Rhomboids', 0.500, 0.295, 0.190, 0.090],
+            ['back', 'weak', 'Latissimus Dorsi (Left)', 'Lat L', 0.395, 0.355, 0.100, 0.165],
+            ['back', 'weak', 'Latissimus Dorsi (Right)', 'Lat R', 0.605, 0.355, 0.100, 0.165],
+            ['back', 'tight', 'Erector Spinae', 'Erector Spinae', 0.500, 0.395, 0.090, 0.125],
+            ['back', 'tight', 'Hamstrings (Left)', 'Hamstring L', 0.385, 0.635, 0.125, 0.140],
+            ['back', 'tight', 'Hamstrings (Right)', 'Hamstring R', 0.615, 0.635, 0.125, 0.140],
+            ['back', 'tight', 'Gastrocnemius (Left)', 'Calf L', 0.365, 0.770, 0.095, 0.105],
+            ['back', 'tight', 'Gastrocnemius (Right)', 'Calf R', 0.635, 0.770, 0.095, 0.105],
 
             // ---- Right side view ----
-            ['right_side', 'tight', 'Upper Trapezius', 'Head / Neck', 0.57, 0.135, 0.18, 0.13],
-            ['right_side', 'tight', 'Pectoralis Major', 'Chest', 0.44, 0.31, 0.16, 0.14],
-            ['right_side', 'tight', 'Thoracic Erector Spinae', 'Thoracic', 0.66, 0.49, 0.12, 0.30],
-            ['right_side', 'weak', 'Deep Abdominals', 'Abdominal', 0.44, 0.56, 0.12, 0.24],
-            ['right_side', 'weak', 'Gluteus Maximus', 'Gluteus', 0.72, 0.615, 0.16, 0.15],
-            ['right_side', 'tight', 'Rectus Femoris', 'Upper Leg', 0.41, 0.67, 0.18, 0.18],
-            ['right_side', 'tight', 'Gastrocnemius', 'Lower Leg', 0.42, 0.855, 0.16, 0.19],
+            ['right_side', 'tight', 'Deep Neck Flexors / SCM', 'Head / Neck', 0.515, 0.115, 0.145, 0.145],
+            ['right_side', 'tight', 'Pectoralis Major', 'Chest', 0.585, 0.290, 0.125, 0.130],
+            ['right_side', 'tight', 'Thoracic Erector Spinae', 'Thoracic', 0.450, 0.350, 0.100, 0.190],
+            ['right_side', 'weak', 'Deep Abdominals', 'Abdominal', 0.585, 0.430, 0.115, 0.115],
+            ['right_side', 'weak', 'Gluteus Maximus', 'Gluteus', 0.450, 0.560, 0.130, 0.120],
+            ['right_side', 'tight', 'Hip Flexors / Quadriceps', 'Upper Leg', 0.435, 0.680, 0.140, 0.150],
+            ['right_side', 'tight', 'Gastrocnemius / Soleus', 'Lower Leg', 0.435, 0.785, 0.115, 0.110],
 
             // ---- Left side view (mirrored x) ----
-            ['left_side', 'tight', 'Upper Trapezius', 'Head / Neck', 0.43, 0.135, 0.18, 0.13],
-            ['left_side', 'tight', 'Pectoralis Major', 'Chest', 0.56, 0.31, 0.16, 0.14],
-            ['left_side', 'tight', 'Thoracic Erector Spinae', 'Thoracic', 0.34, 0.49, 0.12, 0.30],
-            ['left_side', 'weak', 'Deep Abdominals', 'Abdominal', 0.56, 0.56, 0.12, 0.24],
-            ['left_side', 'weak', 'Gluteus Maximus', 'Gluteus', 0.28, 0.615, 0.16, 0.15],
-            ['left_side', 'tight', 'Rectus Femoris', 'Upper Leg', 0.59, 0.67, 0.18, 0.18],
-            ['left_side', 'tight', 'Gastrocnemius', 'Lower Leg', 0.58, 0.855, 0.16, 0.19],
+            ['left_side', 'tight', 'Deep Neck Flexors / SCM', 'Head / Neck', 0.485, 0.115, 0.145, 0.145],
+            ['left_side', 'tight', 'Pectoralis Major', 'Chest', 0.415, 0.290, 0.125, 0.130],
+            ['left_side', 'tight', 'Thoracic Erector Spinae', 'Thoracic', 0.550, 0.350, 0.100, 0.190],
+            ['left_side', 'weak', 'Deep Abdominals', 'Abdominal', 0.415, 0.430, 0.115, 0.115],
+            ['left_side', 'weak', 'Gluteus Maximus', 'Gluteus', 0.550, 0.560, 0.130, 0.120],
+            ['left_side', 'tight', 'Hip Flexors / Quadriceps', 'Upper Leg', 0.565, 0.680, 0.140, 0.150],
+            ['left_side', 'tight', 'Gastrocnemius / Soleus', 'Lower Leg', 0.565, 0.785, 0.115, 0.110],
         ];
 
         // Male and female images are tuned independently, and each result

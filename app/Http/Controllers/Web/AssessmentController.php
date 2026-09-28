@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AssessmentImage;
 use App\Models\PostureAssessment;
 use App\Services\Sparisk\SpariskInterpretationEngine;
+use App\Services\Sparisk\SpariskReportPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -72,6 +73,16 @@ class AssessmentController extends Controller
             'Content-Type' => 'application/msword',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
+    }
+
+    /**
+     * Download the branded PDF version of the assessment report. The PDF is
+     * rendered by the backend so the admin panel and the mobile app share the
+     * exact same document.
+     */
+    public function generatePdf(PostureAssessment $postureAssessment, SpariskReportPdfService $pdf)
+    {
+        return $pdf->download($postureAssessment);
     }
 
     private function buildWordHtml(PostureAssessment $a, array $viewMeasurements): string

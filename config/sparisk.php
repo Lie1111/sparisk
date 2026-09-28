@@ -148,11 +148,11 @@ return [
     | (missing landmark, impossible angle, missing reference).
     */
     'alignment_statuses' => [
-        'normal'   => ['label' => 'On Point',            'color' => 'green'],
-        'mild'     => ['label' => 'Slightly Off Point',  'color' => 'yellow'],
-        'moderate' => ['label' => 'Off Point',           'color' => 'orange'],
-        'severe'   => ['label' => 'Far Off Point',       'color' => 'red'],
-        'review'   => ['label' => 'Check Measurement',   'color' => 'grey'],
+        'normal'   => ['label' => 'Aligned',              'color' => 'green'],
+        'mild'     => ['label' => 'Slightly Misaligned',  'color' => 'yellow'],
+        'moderate' => ['label' => 'Misaligned',           'color' => 'orange'],
+        'severe'   => ['label' => 'Clearly Misaligned',   'color' => 'red'],
+        'review'   => ['label' => 'Check Measurement',    'color' => 'grey'],
     ],
 
     /*
@@ -361,9 +361,9 @@ return [
     ],
 
     'symmetry_states' => [
-        'symmetrical'            => ['label' => 'Symmetrical',            'color' => 'green'],
-        'slightly_asymmetrical'  => ['label' => 'Slightly asymmetrical',  'color' => 'yellow'],
-        'markedly_asymmetrical'  => ['label' => 'Markedly asymmetrical',  'color' => 'orange'],
+        'symmetrical'            => ['label' => 'Even',            'color' => 'green'],
+        'slightly_asymmetrical'  => ['label' => 'Slightly Uneven', 'color' => 'yellow'],
+        'markedly_asymmetrical'  => ['label' => 'Clearly Uneven',  'color' => 'orange'],
     ],
 
     /*
@@ -925,6 +925,7 @@ return [
         'lordosis'          => 'Lordosis Posture (Increased Lumbar Lordosis)',
         'kyphosis_lordosis' => 'Kyphosis - Lordosis Posture',
         'flatback'          => 'Flatback Posture',
+        'sway_back'         => 'Sway-Back Posture',
         'flexed_knee'       => 'Flexed-Knee Posture',
         'genu_recurvatum'   => 'Genu Recurvatum Posture',
         'frontal_asymmetry' => 'Frontal Postural Asymmetry',

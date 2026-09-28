@@ -52,6 +52,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Reports
     Route::post('assessments/{postureAssessment}/reports', [ReportController::class, 'generate']);
+    Route::get('assessments/{postureAssessment}/pdf', [ReportController::class, 'pdf']);
     Route::get('reports/{report}', [ReportController::class, 'show']);
     Route::get('reports/patient', [ReportController::class, 'patientReports']);
 

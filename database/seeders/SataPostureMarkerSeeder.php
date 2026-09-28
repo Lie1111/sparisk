@@ -18,45 +18,52 @@ use Illuminate\Database\Seeder;
  */
 class SataPostureMarkerSeeder extends Seeder
 {
-    /** Zone key => [label, muscle, x, y, width, height] */
+    /**
+     * Zone key => [label, muscle, x, y, width, height]
+     *
+     * x / y are the NORMALIZED CENTRE of the shape (0..1 of the character
+     * image). Each value was measured against the transparent silhouette of
+     * the character PNGs so the shapes sit *on* the body instead of spilling
+     * past the outline.
+     */
     private const POSITIONS = [
         'front' => [
-            'neck'      => ['Neck / SCM', 'Upper Trapezius / SCM', 0.50, 0.135, 0.16, 0.13],
-            'chest_l'   => ['Chest L', 'Pectoralis Major / Minor (L)', 0.37, 0.295, 0.18, 0.15],
-            'chest_r'   => ['Chest R', 'Pectoralis Major / Minor (R)', 0.63, 0.295, 0.18, 0.15],
-            'biceps_l'  => ['Biceps L', 'Biceps Brachii (L)', 0.175, 0.38, 0.11, 0.24],
-            'biceps_r'  => ['Biceps R', 'Biceps Brachii (R)', 0.825, 0.38, 0.11, 0.24],
-            'core'      => ['Core', 'Abdominals / Deep Core', 0.50, 0.50, 0.20, 0.20],
-            'hip_l'     => ['Hip L', 'Gluteus Medius (L)', 0.34, 0.60, 0.16, 0.16],
-            'hip_r'     => ['Hip R', 'Gluteus Medius (R)', 0.66, 0.60, 0.16, 0.16],
-            'thigh_l'   => ['Thigh L', 'Hip Flexors / TFL / Quadriceps (L)', 0.39, 0.695, 0.18, 0.19],
-            'thigh_r'   => ['Thigh R', 'Hip Flexors / TFL / Quadriceps (R)', 0.61, 0.695, 0.18, 0.19],
-            'shin_l'    => ['Shin L', 'Tibialis Anterior (L)', 0.39, 0.80, 0.14, 0.14],
-            'shin_r'    => ['Shin R', 'Tibialis Anterior (R)', 0.61, 0.80, 0.14, 0.14],
-            'calf_l'    => ['Calf L', 'Gastrocnemius (L)', 0.39, 0.875, 0.16, 0.17],
-            'calf_r'    => ['Calf R', 'Gastrocnemius (R)', 0.61, 0.875, 0.16, 0.17],
+            'neck'      => ['Neck / SCM', 'Upper Trapezius / SCM', 0.495, 0.155, 0.160, 0.110],
+            'chest_l'   => ['Chest L', 'Pectoralis Major / Minor (L)', 0.415, 0.285, 0.150, 0.120],
+            'chest_r'   => ['Chest R', 'Pectoralis Major / Minor (R)', 0.585, 0.285, 0.150, 0.120],
+            'biceps_l'  => ['Biceps L', 'Biceps Brachii (L)', 0.225, 0.375, 0.095, 0.170],
+            'biceps_r'  => ['Biceps R', 'Biceps Brachii (R)', 0.775, 0.375, 0.095, 0.170],
+            'core'      => ['Core', 'Abdominals / Deep Core', 0.500, 0.430, 0.200, 0.120],
+            'hip_l'     => ['Hip L', 'Gluteus Medius (L)', 0.390, 0.545, 0.130, 0.100],
+            'hip_r'     => ['Hip R', 'Gluteus Medius (R)', 0.610, 0.545, 0.130, 0.100],
+            'thigh_l'   => ['Thigh L', 'Hip Flexors / TFL / Quadriceps (L)', 0.385, 0.625, 0.140, 0.145],
+            'thigh_r'   => ['Thigh R', 'Hip Flexors / TFL / Quadriceps (R)', 0.615, 0.625, 0.140, 0.145],
+            'shin_l'    => ['Shin L', 'Tibialis Anterior (L)', 0.382, 0.720, 0.085, 0.075],
+            'shin_r'    => ['Shin R', 'Tibialis Anterior (R)', 0.618, 0.720, 0.085, 0.075],
+            'calf_l'    => ['Calf L', 'Gastrocnemius (L)', 0.382, 0.790, 0.085, 0.080],
+            'calf_r'    => ['Calf R', 'Gastrocnemius (R)', 0.618, 0.790, 0.085, 0.080],
         ],
         'back' => [
-            'upper_trap'  => ['Upper Trap', 'Upper Trapezius / Levator Scapulae', 0.50, 0.17, 0.24, 0.14],
-            'rhomboids'   => ['Rhomboids', 'Rhomboids / Middle Trapezius', 0.50, 0.28, 0.40, 0.16],
-            'lat_l'       => ['Lat L', 'Latissimus Dorsi / Serratus Anterior (L)', 0.31, 0.39, 0.14, 0.22],
-            'lat_r'       => ['Lat R', 'Latissimus Dorsi / Serratus Anterior (R)', 0.69, 0.39, 0.14, 0.22],
-            'erector'     => ['Erector Spinae', 'Erector Spinae / Multifidus / QL', 0.50, 0.54, 0.12, 0.24],
-            'glute_l'     => ['Glute L', 'Gluteus Maximus / Medius (L)', 0.40, 0.60, 0.16, 0.14],
-            'glute_r'     => ['Glute R', 'Gluteus Maximus / Medius (R)', 0.60, 0.60, 0.16, 0.14],
-            'hamstring_l' => ['Hamstring L', 'Hamstrings (L)', 0.39, 0.695, 0.18, 0.19],
-            'hamstring_r' => ['Hamstring R', 'Hamstrings (R)', 0.61, 0.695, 0.18, 0.19],
-            'calf_l'      => ['Calf L', 'Gastrocnemius / Soleus (L)', 0.39, 0.875, 0.16, 0.17],
-            'calf_r'      => ['Calf R', 'Gastrocnemius / Soleus (R)', 0.61, 0.875, 0.16, 0.17],
+            'upper_trap'  => ['Upper Trap', 'Upper Trapezius / Levator Scapulae', 0.500, 0.215, 0.260, 0.090],
+            'rhomboids'   => ['Rhomboids', 'Rhomboids / Middle Trapezius', 0.500, 0.295, 0.190, 0.090],
+            'lat_l'       => ['Lat L', 'Latissimus Dorsi / Serratus Anterior (L)', 0.395, 0.355, 0.100, 0.165],
+            'lat_r'       => ['Lat R', 'Latissimus Dorsi / Serratus Anterior (R)', 0.605, 0.355, 0.100, 0.165],
+            'erector'     => ['Erector Spinae', 'Erector Spinae / Multifidus / QL', 0.500, 0.395, 0.090, 0.125],
+            'glute_l'     => ['Glute L', 'Gluteus Maximus / Medius (L)', 0.390, 0.535, 0.140, 0.110],
+            'glute_r'     => ['Glute R', 'Gluteus Maximus / Medius (R)', 0.610, 0.535, 0.140, 0.110],
+            'hamstring_l' => ['Hamstring L', 'Hamstrings (L)', 0.385, 0.635, 0.125, 0.140],
+            'hamstring_r' => ['Hamstring R', 'Hamstrings (R)', 0.615, 0.635, 0.125, 0.140],
+            'calf_l'      => ['Calf L', 'Gastrocnemius / Soleus (L)', 0.365, 0.770, 0.095, 0.105],
+            'calf_r'      => ['Calf R', 'Gastrocnemius / Soleus (R)', 0.635, 0.770, 0.095, 0.105],
         ],
         'right_side' => [
-            'head'       => ['Head / Neck', 'Deep Neck Flexors / SCM', 0.57, 0.135, 0.18, 0.13],
-            'chest'      => ['Chest', 'Pectoralis Major / Minor', 0.44, 0.31, 0.16, 0.14],
-            'thoracic'   => ['Thoracic', 'Thoracic Erector Spinae / Lower Trapezius', 0.66, 0.49, 0.12, 0.30],
-            'abdominal'  => ['Abdominal', 'Deep Abdominals / Transverse Abdominis', 0.44, 0.56, 0.12, 0.24],
-            'gluteus'    => ['Gluteus', 'Gluteus Maximus', 0.72, 0.615, 0.16, 0.15],
-            'upper_leg'  => ['Upper Leg', 'Hip Flexors / Quadriceps / Hamstrings', 0.41, 0.67, 0.18, 0.18],
-            'lower_leg'  => ['Lower Leg', 'Gastrocnemius / Soleus / Tibialis', 0.42, 0.855, 0.16, 0.19],
+            'head'       => ['Head / Neck', 'Deep Neck Flexors / SCM', 0.515, 0.115, 0.145, 0.145],
+            'chest'      => ['Chest', 'Pectoralis Major / Minor', 0.585, 0.290, 0.125, 0.130],
+            'thoracic'   => ['Thoracic', 'Thoracic Erector Spinae / Lower Trapezius', 0.450, 0.350, 0.100, 0.190],
+            'abdominal'  => ['Abdominal', 'Deep Abdominals / Transverse Abdominis', 0.585, 0.430, 0.115, 0.115],
+            'gluteus'    => ['Gluteus', 'Gluteus Maximus', 0.450, 0.560, 0.130, 0.120],
+            'upper_leg'  => ['Upper Leg', 'Hip Flexors / Quadriceps / Hamstrings', 0.435, 0.680, 0.140, 0.150],
+            'lower_leg'  => ['Lower Leg', 'Gastrocnemius / Soleus / Tibialis', 0.435, 0.785, 0.115, 0.110],
         ],
     ];
 
@@ -106,6 +113,12 @@ class SataPostureMarkerSeeder extends Seeder
             'back' => ['tight' => ['upper_trap', 'erector', 'hamstring_l', 'hamstring_r'], 'weak' => ['upper_trap', 'erector', 'glute_l', 'glute_r', 'calf_l', 'calf_r']],
             'right_side' => ['tight' => ['head', 'chest', 'thoracic', 'upper_leg'], 'weak' => ['head', 'abdominal', 'gluteus']],
         ],
+        'sway_back' => [
+            'label' => 'Sway-Back Posture',
+            'front' => ['tight' => ['thigh_l', 'thigh_r', 'calf_l', 'calf_r'], 'weak' => ['core', 'hip_l', 'hip_r']],
+            'back' => ['tight' => ['erector', 'hamstring_l', 'hamstring_r', 'calf_l', 'calf_r'], 'weak' => ['upper_trap', 'glute_l', 'glute_r']],
+            'right_side' => ['tight' => ['upper_leg', 'lower_leg'], 'weak' => ['thoracic', 'abdominal', 'gluteus']],
+        ],
         'flexed_knee' => [
             'label' => 'Flexed-Knee Posture',
             'front' => ['tight' => ['thigh_l', 'thigh_r', 'calf_l', 'calf_r'], 'weak' => ['core', 'thigh_l', 'thigh_r', 'shin_l', 'shin_r']],
@@ -117,6 +130,18 @@ class SataPostureMarkerSeeder extends Seeder
             'front' => ['tight' => ['thigh_l', 'thigh_r', 'shin_l', 'shin_r', 'calf_l', 'calf_r'], 'weak' => ['core', 'thigh_l', 'thigh_r']],
             'back' => ['tight' => ['erector', 'glute_l', 'glute_r', 'hamstring_l', 'hamstring_r', 'calf_l', 'calf_r'], 'weak' => ['erector', 'glute_l', 'glute_r', 'hamstring_l', 'hamstring_r']],
             'right_side' => ['tight' => ['upper_leg', 'lower_leg'], 'weak' => ['thoracic', 'abdominal', 'gluteus']],
+        ],
+        'frontal_asymmetry' => [
+            'label' => 'Frontal Postural Asymmetry',
+            'front' => ['tight' => ['neck', 'chest_l', 'biceps_l', 'hip_l'], 'weak' => ['core', 'hip_r', 'thigh_r']],
+            'back' => ['tight' => ['upper_trap', 'erector', 'glute_r'], 'weak' => ['lat_l', 'glute_l', 'hamstring_l']],
+            'right_side' => ['tight' => ['head', 'chest', 'thoracic'], 'weak' => ['thoracic', 'abdominal', 'gluteus']],
+        ],
+        'pronated_foot' => [
+            'label' => 'Pronated Foot Posture',
+            'front' => ['tight' => ['calf_l', 'calf_r'], 'weak' => ['shin_l', 'shin_r']],
+            'back' => ['tight' => ['calf_l', 'calf_r'], 'weak' => ['glute_l', 'glute_r']],
+            'right_side' => ['tight' => ['lower_leg'], 'weak' => ['gluteus']],
         ],
     ];
 
@@ -130,9 +155,15 @@ class SataPostureMarkerSeeder extends Seeder
                         continue;
                     }
 
+                    // A zone can only render one way: if a pattern lists the
+                    // same zone as tight and weak it would stack two shapes on
+                    // identical coordinates, so tight wins.
+                    $tight = $viewPattern['tight'] ?? [];
+                    $weak = array_values(array_diff($viewPattern['weak'] ?? [], $tight));
+
                     $order = 0;
-                    foreach (['tight' => 'tight', 'weak' => 'weak'] as $type => $key) {
-                        foreach ($viewPattern[$key] ?? [] as $zone) {
+                    foreach (['tight' => $tight, 'weak' => $weak] as $type => $zones) {
+                        foreach ($zones as $zone) {
                             $pos = $this->position($view, $zone);
                             if ($pos === null) {
                                 continue;

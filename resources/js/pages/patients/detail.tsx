@@ -13,6 +13,7 @@ import {
     ImageIcon,
     Target,
     FileText,
+    Download,
 } from 'lucide-react';
 
 type Props = {
@@ -30,10 +31,10 @@ const viewLabels: Record<string, string> = {
 };
 
 const alignmentLabels: Record<string, string> = {
-    normal: 'On Point',
-    mild: 'Slightly Off Point',
-    moderate: 'Off Point',
-    severe: 'Far Off Point',
+    normal: 'Aligned',
+    mild: 'Slightly Misaligned',
+    moderate: 'Misaligned',
+    severe: 'Clearly Misaligned',
     review: 'Check Measurement',
 };
 
@@ -52,7 +53,7 @@ const alignmentStatusOf = (m: any) => {
 };
 
 const alignmentLabelOf = (m: any) =>
-    m?.alignment_label || alignmentLabels[alignmentStatusOf(m)] || 'On Point';
+    m?.alignment_label || alignmentLabels[alignmentStatusOf(m)] || 'Aligned';
 
 const humanize = (value?: string) =>
     (value || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
@@ -145,13 +146,22 @@ export default function AssessmentDetail({ patient, assessment, viewMeasurements
                         <ArrowLeft className="h-4 w-4" />
                         Back to {patient.name}
                     </Link>
-                    <a
-                        href={`/assessments/${assessment.id}/word`}
-                        className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50"
-                    >
-                        <FileText className="h-4 w-4" />
-                        Download Word
-                    </a>
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={`/assessments/${assessment.id}/pdf`}
+                            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50"
+                        >
+                            <Download className="h-4 w-4" />
+                            Download PDF
+                        </a>
+                        <a
+                            href={`/assessments/${assessment.id}/word`}
+                            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted/50"
+                        >
+                            <FileText className="h-4 w-4" />
+                            Download Word
+                        </a>
+                    </div>
                 </div>
 
                 {/* Score & meta */}

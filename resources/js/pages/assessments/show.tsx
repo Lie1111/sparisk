@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BreadcrumbItem } from '@/types'
-import { ArrowLeft, Target, Dumbbell, CalendarDays, Star, Info, TrendingUp, Activity, Camera } from 'lucide-react'
+import { ArrowLeft, Target, Dumbbell, CalendarDays, Star, Info, TrendingUp, Activity, Camera, Download, FileText } from 'lucide-react'
 import PoseLandmarkCapture from '@/components/pose-landmark-capture'
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -23,10 +23,10 @@ const viewLabels: Record<string, string> = {
 // map keeps stored measurements (which only carry the band) rendering the same
 // wording as interpreted ones.
 const alignmentLabels: Record<string, string> = {
-    normal: 'On Point',
-    mild: 'Slightly Off Point',
-    moderate: 'Off Point',
-    severe: 'Far Off Point',
+    normal: 'Aligned',
+    mild: 'Slightly Misaligned',
+    moderate: 'Misaligned',
+    severe: 'Clearly Misaligned',
     review: 'Check Measurement',
 }
 
@@ -45,10 +45,19 @@ const alignmentStatusOf = (m: any) => {
 }
 
 const alignmentLabelOf = (m: any) =>
-    m?.alignment_label || alignmentLabels[alignmentStatusOf(m)] || 'On Point'
+    m?.alignment_label || alignmentLabels[alignmentStatusOf(m)] || 'Aligned'
 
 const humanize = (value?: string) =>
     (value || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+
+// Laravel serialises decimal columns as strings, so a measurement value can
+// arrive as "176.50" and has no `toFixed`. Coerce it first, and fall back to
+// the raw text when it is not numeric at all.
+const fmtAngle = (v: any) => {
+    if (v == null || v === '') return '—'
+    const n = typeof v === 'number' ? v : parseFloat(v)
+    return isNaN(n) ? String(v) : n.toFixed(1)
+}
 
 export default function AssessmentShow({ assessment, viewMeasurements, classification }: any) {
     const patient = assessment.patient
@@ -90,6 +99,20 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                     <h1 className="text-xl font-bold">
                         {patient?.name} — {assessment.time_mark}
                     </h1>
+                    <div className="ml-auto flex items-center gap-2">
+                        <a href={`/assessments/${assessment.id}/pdf`}>
+                            <Button variant="outline" size="sm">
+                                <Download className="mr-2 h-4 w-4" />
+                                Download PDF
+                            </Button>
+                        </a>
+                        <a href={`/assessments/${assessment.id}/word`}>
+                            <Button variant="outline" size="sm">
+                                <FileText className="mr-2 h-4 w-4" />
+                                Download Word
+                            </Button>
+                        </a>
+                    </div>
                 </div>
 
                 {/* Score & Meta */}
@@ -164,7 +187,7 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                                                 <span className="text-sm">{m.label}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium">{m.value?.toFixed(1)}°</span>
+                                                                <span className="text-sm font-medium">{fmtAngle(m.value)}°</span>
                                                                 {status !== 'normal' && (
                                                                     <Badge className={`text-[10px] px-1.5 ${alignmentStyles[status]}`}>
                                                                         {alignmentLabelOf(m)}
