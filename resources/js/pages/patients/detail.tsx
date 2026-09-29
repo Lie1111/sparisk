@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { type BreadcrumbItem } from '@/types';
@@ -76,12 +77,22 @@ const dayLabels: Record<string, string> = {
  */
 const HighlightedImageView = ({ img, storageUrl }: { img: any; storageUrl: (p: string) => string }) => {
     const highlights: any[] = Array.isArray(img.highlights) ? img.highlights : [];
+    // Highlight rectangles are normalized against the full image, so the
+    // container must match the photo's own aspect ratio — otherwise
+    // `object-cover` crops the photo and the highlights drift.
+    const [ratio, setRatio] = useState<string>('3 / 4');
     return (
-        <div className="relative h-48 w-full overflow-hidden rounded-md border">
+        <div className="relative w-full overflow-hidden rounded-md border" style={{ aspectRatio: ratio }}>
             <img
                 src={storageUrl(img.image_path)}
                 alt={viewLabels[img.view] || img.view}
                 className="absolute inset-0 h-full w-full object-cover"
+                onLoad={(e) => {
+                    const el = e.currentTarget;
+                    if (el.naturalWidth && el.naturalHeight) {
+                        setRatio(`${el.naturalWidth} / ${el.naturalHeight}`);
+                    }
+                }}
             />
             {highlights.map((h: any, i: number) => {
                 const left = Number(h.left) * 100;

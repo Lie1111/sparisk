@@ -62,30 +62,31 @@ class PostureMarkerSeeder extends Seeder
             ['left_side', 'tight', 'Gastrocnemius / Soleus', 'Lower Leg', 0.565, 0.785, 0.115, 0.110],
         ];
 
+        // Rebuild the generic (severity-based) sets from the reference
+        // geometry on every run so re-seeding restores the original
+        // alignment even if the rows were edited or drifted.
+        PostureMarker::whereNull('condition')->delete();
+
         // Male and female images are tuned independently, and each result
         // severity (normal / moderate / severe) has its own marker set. Every
         // set starts from the same reference pattern and can be edited later.
         foreach (['normal', 'moderate', 'severe'] as $severity) {
             foreach (['male', 'female'] as $gender) {
                 foreach ($markers as $index => [$view, $type, $muscle, $label, $x, $y, $w, $h]) {
-                    PostureMarker::firstOrCreate(
-                        [
-                            'view' => $view,
-                            'gender' => $gender,
-                            'severity' => $severity,
-                            'muscle' => $muscle,
-                        ],
-                        [
-                            'type' => $type,
-                            'label' => $label,
-                            'x' => $x,
-                            'y' => $y,
-                            'width' => $w,
-                            'height' => $h,
-                            'order_index' => $index,
-                            'is_active' => true,
-                        ]
-                    );
+                    PostureMarker::create([
+                        'view' => $view,
+                        'gender' => $gender,
+                        'severity' => $severity,
+                        'type' => $type,
+                        'label' => $label,
+                        'muscle' => $muscle,
+                        'x' => $x,
+                        'y' => $y,
+                        'width' => $w,
+                        'height' => $h,
+                        'order_index' => $index,
+                        'is_active' => true,
+                    ]);
                 }
             }
         }

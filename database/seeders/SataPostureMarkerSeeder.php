@@ -147,6 +147,10 @@ class SataPostureMarkerSeeder extends Seeder
 
     public function run(): void
     {
+        // Rebuild the condition-specific sets from the reference geometry on
+        // every run so re-seeding restores the original alignment.
+        PostureMarker::whereNotNull('condition')->delete();
+
         foreach (self::PATTERNS as $slug => $pattern) {
             foreach (['male', 'female'] as $gender) {
                 foreach (['front', 'back', 'right_side', 'left_side'] as $view) {
@@ -170,25 +174,22 @@ class SataPostureMarkerSeeder extends Seeder
                             }
                             [$label, $muscle, $x, $y, $w, $h] = $pos;
 
-                            PostureMarker::firstOrCreate(
-                                [
-                                    'view' => $view,
-                                    'gender' => $gender,
-                                    'condition' => $slug,
-                                    'muscle' => $muscle,
-                                ],
-                                [
-                                    'severity' => 'normal',
-                                    'type' => $type,
-                                    'label' => $label,
-                                    'x' => $x,
-                                    'y' => $y,
-                                    'width' => $w,
-                                    'height' => $h,
-                                    'order_index' => $order++,
-                                    'is_active' => true,
-                                ]
-                            );
+                            PostureMarker::create([
+                                'view' => $view,
+                                'gender' => $gender,
+                                'condition' => $slug,
+                                'muscle' => $muscle,
+                                'severity' => 'normal',
+                                'type' => $type,
+                                'label' => $label,
+                                'x' => $x,
+                                'y' => $y,
+                                'width' => $w,
+                                'height' => $h,
+                                'order_index' => $order,
+                                'is_active' => true,
+                            ]);
+                            $order++;
                         }
                     }
                 }

@@ -24,6 +24,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Initial Page Data
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the initial page data is rendered inside a
+    | <script type="application/json"> element instead of a data-page
+    | attribute. This is required by @inertiajs client v3+.
+    |
+    */
+
+    'use_script_element_for_initial_page' => (bool) env('INERTIA_USE_SCRIPT_ELEMENT_FOR_INITIAL_PAGE', true),
+
+    /*
+    |--------------------------------------------------------------------------
     | Testing
     |--------------------------------------------------------------------------
     |
