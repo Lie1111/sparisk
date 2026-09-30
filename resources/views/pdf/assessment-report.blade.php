@@ -4,40 +4,46 @@
 <meta charset="utf-8">
 <title>SPARISK Posture Report</title>
 <style>
-    /* The top and bottom margins hold the running page head (centred title +
-       date/byline) and the footer, both of which are painted onto the canvas by
-       SpariskReportPdfService::stampChrome(). */
-    @page { margin: 60px 38px 58px 38px; }
+    /* The top and bottom margins hold the running page head (SATA badge +
+       report title + date/byline) and the footer, both of which are painted
+       onto the canvas by SpariskReportPdfService::stampChrome(). */
+    @page { margin: 64pt 38pt 56pt 38pt; }
 
     * { box-sizing: border-box; }
 
     body {
         font-family: 'DejaVu Sans', sans-serif;
         font-size: 9.5px;
+        line-height: 1.45;
         color: #0A3C50;
         margin: 0;
     }
 
     /* ---------- Section band ---------- */
-    /* Full-width filled bar, the way the reference report heads each section. */
+    /* Full-width filled bar with a teal accent edge, the way the reference
+       report heads each section. */
     .band {
-        background: #DCE9EC;
+        background: #EAF2F4;
         color: #0A3C50;
         font-size: 9px;
         font-weight: bold;
         text-transform: uppercase;
-        letter-spacing: 0.8px;
-        padding: 4px 8px;
-        margin: 13px 0 8px 0;
+        letter-spacing: 1px;
+        padding: 5px 9px;
+        border-left: 3px solid #0E7C86;
+        margin: 16px 0 9px 0;
     }
     .band.first { margin-top: 0; }
 
     /* ---------- View heading (A. FRONT, B. BACK, …) ---------- */
     .view-head {
-        font-size: 11px;
+        font-size: 12px;
         font-weight: bold;
         color: #0A3C50;
-        margin: 13px 0 8px 0;
+        letter-spacing: 0.3px;
+        padding-bottom: 4px;
+        border-bottom: 2px solid #0E7C86;
+        margin: 16px 0 10px 0;
     }
     .view-head .ltr { color: #0E7C86; }
     .view-head.first { margin-top: 0; }
@@ -45,62 +51,74 @@
     .muted { color: #64748B; }
     .pb { page-break-after: always; }
 
-    /* ---------- Patient / detail fields ---------- */
+    /* ---------- Patient / detail fields ----------
+       Each cell stacks a small uppercase label over its value, so the page
+       reads as a clean data grid instead of a run of inline text. */
     table.fields { width: 100%; border-collapse: collapse; }
     table.fields td {
-        padding: 5px 10px 5px 0;
+        padding: 7px 12px 7px 0;
         border-bottom: 1px solid #E4EBEE;
         vertical-align: top;
     }
     .pl {
-        font-size: 8px;
+        display: block;
+        font-size: 7.5px;
         font-weight: bold;
-        color: #334155;
+        color: #64748B;
         text-transform: uppercase;
-        letter-spacing: 0.3px;
+        letter-spacing: 0.5px;
+        margin-bottom: 2px;
     }
-    .pv { font-size: 9.5px; color: #0A3C50; }
+    .pv { display: block; font-size: 10px; color: #0A3C50; }
 
-    /* ---------- Overview lines ---------- */
-    .overview p { margin: 0 0 3px 0; font-size: 9.5px; }
+    /* ---------- Overview panel ---------- */
+    .overview {
+        background: #F6F9FA;
+        border: 1px solid #E4EBEE;
+        border-left: 3px solid #0E7C86;
+        padding: 8px 11px;
+    }
+    .overview p { margin: 0 0 4px 0; font-size: 9.5px; }
+    .overview p:last-child { margin-bottom: 0; }
 
-    /* ---------- Data tables (Label / Section / Value) ---------- */
+    /* ---------- Data tables ---------- */
     table.data { width: 100%; border-collapse: collapse; }
     table.data th {
         font-size: 7.5px;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
+        letter-spacing: 0.5px;
         color: #0A3C50;
         background: #E7EEF1;
         text-align: left;
-        padding: 5px 8px;
+        padding: 6px 8px;
         border: 1px solid #D7E0E5;
     }
-    table.data th.c-sec { background: #D6E7EA; }
+    table.data th.c-sec { background: #DCE9EC; }
     table.data td {
         font-size: 9.5px;
-        padding: 4px 8px;
+        padding: 5px 8px;
         border: 1px solid #D7E0E5;
         vertical-align: top;
     }
     table.data tbody tr:nth-child(even) td { background: #F6F9FA; }
     .c-code { width: 12%; }
     .c-val { width: 14%; text-align: right; }
+    .c-corr { width: 22%; }
     .val { font-weight: bold; }
 
     /* ---------- Photo + table split (A./B. pages) ---------- */
     table.split { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
     table.split > tbody > tr > td { vertical-align: top; }
-    td.photo { width: 42%; padding-right: 10px; text-align: center; }
+    td.photo { width: 42%; padding-right: 12px; text-align: center; }
     /* The posture photos are tall, narrow crops, so they are sized by height
        (dompdf scales the width proportionally) to fill the page. */
     td.photo img { height: 470pt; border: 1px solid #E4EBEE; }
 
     /* ---------- Two views side by side (C./D. page) ---------- */
     table.two-col { width: 100%; border-collapse: collapse; }
-    table.two-col > tbody > tr > td { width: 50%; vertical-align: top; padding-right: 9px; }
-    table.two-col > tbody > tr > td + td { padding-right: 0; padding-left: 9px; }
-    .side-photo { text-align: center; margin-bottom: 7px; }
+    table.two-col > tbody > tr > td { width: 50%; vertical-align: top; padding-right: 10px; }
+    table.two-col > tbody > tr > td + td { padding-right: 0; padding-left: 10px; }
+    .side-photo { text-align: center; margin-bottom: 8px; }
     .side-photo img { height: 470pt; border: 1px solid #E4EBEE; }
 
     /* ---------- Anatomical labels on a posture photo ----------
@@ -128,6 +146,44 @@
     .cm-leader { position: absolute; height: 0; border-top: 2px dashed #0E7C86; }
     .cm-dot { position: absolute; width: 6px; height: 6px; border-radius: 3px; background: #0E7C86; }
 
+    /* ---------- APECS pose overlay ----------
+       Drawn on top of the photo as plain CSS borders so dompdf emits real
+       vector operators (line, dash, fill) instead of a flattened bitmap.
+       Layer order, bottom to top: photo, grid, green plumb, red alignment,
+       blue segments, orange levels, markers, angle labels. */
+    .ov-grid-v { position: absolute; top: 0; width: 0; border-left: 0.5px solid rgba(100,116,139,0.5); }
+    .ov-grid-h { position: absolute; height: 0; border-top: 0.5px solid rgba(100,116,139,0.5); }
+    .ov-plumb { position: absolute; top: 0; width: 0; border-left: 2px solid #2ECC40; }
+    .ov-align { position: absolute; height: 0; border-top: 2px dashed #E74C3C; transform-origin: 0 0; }
+    .ov-seg { position: absolute; height: 0; border-top: 2px solid #2563EB; transform-origin: 0 0; }
+    .ov-level { position: absolute; height: 0; border-top: 2px solid #F59E0B; transform-origin: 0 0; }
+    .ov-mk { position: absolute; box-sizing: border-box; width: 6pt; height: 6pt; border-radius: 3pt; background: #FFFFFF; border: 1px solid #2563EB; }
+    .ov-deg {
+        position: absolute;
+        font-size: 7px;
+        font-weight: bold;
+        line-height: 9px;
+        white-space: nowrap;
+        color: #1D4ED8;
+        background: #FFFFFF;
+        border: 1px solid #2563EB;
+        padding: 0 2px;
+    }
+    .ov-align-tag {
+        position: absolute;
+        font-size: 7.5px;
+        font-weight: bold;
+        line-height: 10px;
+        white-space: nowrap;
+        color: #E74C3C;
+        background: #FFFFFF;
+        border: 1px solid #E74C3C;
+        padding: 0 3px;
+    }
+    .ov-tag { position: absolute; width: 22pt; text-align: center; font-size: 7.5px; font-weight: bold; line-height: 10px; background: #FFFFFF; }
+    .ov-tag-green { color: #2ECC40; border: 1px solid #2ECC40; }
+    .ov-tag-red { color: #E74C3C; border: 1px solid #E74C3C; }
+
     /* ---------- Score-card grid ---------- */
     table.cards { width: 100%; border-collapse: separate; border-spacing: 7px; }
     table.cards td.card {
@@ -144,14 +200,15 @@
     .card-code { font-size: 7.5px; color: #64748B; margin-top: 5px; }
 
     /* ---------- Exercise cards ---------- */
-    table.ex-grid { width: 100%; border-collapse: separate; border-spacing: 7px; }
+    table.ex-grid { width: 100%; border-collapse: separate; border-spacing: 8px; }
     table.ex-grid td.ex-card {
         width: 50%;
         vertical-align: top;
         border: 1px solid #D7E0E5;
+        border-top: 3px solid #0E7C86;
         padding: 0;
     }
-    .ex-head { background: #E7F4F5; padding: 5px 8px; border-bottom: 1px solid #D7E0E5; }
+    .ex-head { background: #E7F4F5; padding: 6px 9px; border-bottom: 1px solid #D7E0E5; }
     .ex-no {
         display: inline-block;
         width: 15px;
@@ -166,21 +223,22 @@
         margin-right: 6px;
     }
     .ex-name { font-size: 9.5px; font-weight: bold; color: #0A3C50; }
-    .ex-photo { text-align: center; padding: 7px 8px 0 8px; }
+    .ex-photo { text-align: center; padding: 8px 9px 0 9px; }
     .ex-photo img { width: 100%; border: 1px solid #E4EBEE; }
-    .ex-body { padding: 6px 8px; }
-    .ex-meta { font-size: 8px; color: #0E7C86; margin-bottom: 3px; }
+    .ex-body { padding: 7px 9px; }
+    .ex-meta { font-size: 8px; font-weight: bold; color: #0E7C86; margin-bottom: 3px; }
     .ex-note { font-size: 8.5px; color: #475569; }
 
-    .comment { font-size: 9.5px; font-weight: bold; color: #0A3C50; margin: 8px 0 4px 0; }
+    .comment { font-size: 9.5px; font-weight: bold; color: #0A3C50; margin: 10px 0 5px 0; }
 
     .star { color: #CA8A04; }
 
     .footnote {
-        margin-top: 14px;
-        padding-top: 6px;
+        margin-top: 16px;
+        padding-top: 8px;
         border-top: 1px solid #CBD5E1;
         font-size: 8px;
+        line-height: 1.5;
         color: #64748B;
     }
 </style>
@@ -231,6 +289,7 @@
                     @else
                         <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
                             <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
+                            @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => true])
                             @foreach ($images[$key]['levels'] as $level)
                                 <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
                                 <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
@@ -247,6 +306,7 @@
                             <th class="c-code">Label</th>
                             <th class="c-sec">Section</th>
                             <th class="c-val">Value</th>
+                            <th class="c-corr">Correction Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -255,9 +315,10 @@
                                 <td>{{ $row['code'] }}</td>
                                 <td>{{ $row['name'] }}</td>
                                 <td class="val" style="color: {{ $row['color'] }}">{{ $row['value'] }}°</td>
+                                <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="muted">No measurements captured for this view.</td></tr>
+                            <tr><td colspan="4" class="muted">No measurements captured for this view.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -280,6 +341,7 @@
                         @else
                             <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
                                 <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
+                                @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => false])
                                 @foreach ($images[$key]['levels'] as $level)
                                     <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
                                     <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
@@ -295,6 +357,7 @@
                             <th class="c-code">Label</th>
                             <th class="c-sec">Section</th>
                             <th class="c-val">Value</th>
+                            <th class="c-corr">Correction Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -303,9 +366,10 @@
                                 <td>{{ $row['code'] }}</td>
                                 <td>{{ $row['name'] }}</td>
                                 <td class="val" style="color: {{ $row['color'] }}">{{ $row['value'] }}°</td>
+                                <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="3" class="muted">No measurements.</td></tr>
+                            <tr><td colspan="4" class="muted">No measurements.</td></tr>
                         @endforelse
                     </tbody>
                 </table>

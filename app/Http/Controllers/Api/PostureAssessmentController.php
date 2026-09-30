@@ -51,6 +51,7 @@ class PostureAssessmentController extends Controller
             'images.*.view' => 'required|in:front,back,right_side,left_side',
             'images.*.file' => 'required|image|max:10240',
             'images.*.highlights' => 'nullable',
+            'images.*.landmarks' => 'nullable',
         ]);
 
         $previousAssessments = $patient->postureAssessments()->count();
@@ -102,6 +103,7 @@ class PostureAssessmentController extends Controller
                             'view' => $imageData['view'],
                             'image_path' => $path,
                             'highlights' => $this->decodeHighlights($imageData['highlights'] ?? null),
+                            'landmarks' => $this->decodeLandmarks($imageData['landmarks'] ?? null),
                             'order_index' => $index,
                         ]);
                     }
@@ -237,6 +239,27 @@ class PostureAssessmentController extends Controller
         $decoded = json_decode((string) $raw, true);
 
         return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Normalises the per-image pose landmarks coming from the app.
+     *
+     * The Flutter app sends `images[i][landmarks]` as a JSON-encoded list of
+     * the 33 MediaPipe landmarks ({x,y,z,visibility} normalized 0..1). These
+     * are stored verbatim so the PDF report can draw the APECS posture overlay
+     * (grid, plumb line, alignment line, segment lines, markers) as vectors.
+     */
+    private function decodeLandmarks(mixed $raw): ?array
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
+        if (is_array($raw)) {
+            return $raw;
+        }
+        $decoded = json_decode((string) $raw, true);
+
+        return is_array($decoded) && !empty($decoded) ? $decoded : null;
     }
 
     public function destroy(PostureAssessment $postureAssessment): JsonResponse

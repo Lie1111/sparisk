@@ -84,6 +84,121 @@ class SpariskReportPdfService
         'back' => ['Shoulders' => [0.26, 0.22]],
     ];
 
+    // ------------------------------------------------------------------
+    // APECS posture overlay
+    // ------------------------------------------------------------------
+
+    /**
+     * MediaPipe pose landmark indices the overlay draws with.
+     *
+     * The app normalises its 33 detected landmarks to the photo (0..1) and
+     * uploads them in index order, so a lookup by index is stable.
+     */
+    private const LM = [
+        'nose' => 0,
+        'l_ear' => 7,
+        'r_ear' => 8,
+        'l_shoulder' => 11,
+        'r_shoulder' => 12,
+        'l_elbow' => 13,
+        'r_elbow' => 14,
+        'l_wrist' => 15,
+        'r_wrist' => 16,
+        'l_hip' => 23,
+        'r_hip' => 24,
+        'l_knee' => 25,
+        'r_knee' => 26,
+        'l_ankle' => 27,
+        'r_ankle' => 28,
+        'l_foot' => 31,
+        'r_foot' => 32,
+    ];
+
+    /** Overlay palette, matching the reference plates. */
+    private const OV_GRID = 'rgba(100,116,139,0.5)';
+
+    private const OV_GREEN = '#2ECC40';
+
+    private const OV_RED = '#E74C3C';
+
+    private const OV_ORANGE = '#F59E0B';
+
+    private const OV_BLUE = '#2563EB';
+
+    /** Grid lines drawn per photo height, so every view shares one cell size. */
+    private const OV_GRID_ROWS = 26;
+
+    /**
+     * Levels drawn across the body for the upright views, top to bottom.
+     *
+     * Each entry pairs a name with the two landmarks its horizontal line joins.
+     * Derived entries interpolate between the shoulder and the hip, so a level
+     * without its own landmark (the ribcage, the axillae) still lands on the
+     * right part of the trunk.
+     */
+    private const OV_LEVELS_UPRIGHT = [
+        'front' => [
+            ['Head', 'l_ear', 'r_ear'],
+            ['Acrom.', 'l_shoulder', 'r_shoulder'],
+            ['Ribc.', '@0.30', '@0.30'],
+            ['ASIS', 'l_hip', 'r_hip'],
+            ['Knees', 'l_knee', 'r_knee'],
+            ['Feet', 'l_ankle', 'r_ankle'],
+        ],
+        'back' => [
+            ['Ears', 'l_ear', 'r_ear'],
+            ['Shoulders', 'l_shoulder', 'r_shoulder'],
+            ['Axillae', '@0.20', '@0.20'],
+            ['Top of the curve', '@0.42', '@0.42'],
+            ['PSIS', 'l_hip', 'r_hip'],
+            ['Knees', 'l_knee', 'r_knee'],
+            ['Feet', 'l_ankle', 'r_ankle'],
+        ],
+    ];
+
+    /**
+     * Levels for the side profiles: a single landmark per level, joined to the
+     * plumb line. The first three are read off the horizontal, the leg and foot
+     * entries off the segment itself.
+     */
+    private const OV_LEVELS_SIDE = [
+        ['Head', 'ear', 'horiz'],
+        ['Shoulders', 'shoulder', 'horiz'],
+        ['Pelvis', 'hip', 'horiz'],
+        ['Femur', 'knee', 'vert'],
+        ['Tibia', 'ankle', 'vert'],
+        ['Foot', 'foot', 'horiz'],
+    ];
+
+    /**
+     * The blue bone segments each view draws, as landmark pairs.
+     *
+     * Upright views read both legs; the profiles read the single side facing
+     * the camera, chained from the ear down to the foot so the whole posture
+     * line is traced.
+     */
+    private const OV_SEGMENTS = [
+        'front' => [
+            ['l_hip', 'l_knee'], ['l_knee', 'l_ankle'],
+            ['r_hip', 'r_knee'], ['r_knee', 'r_ankle'],
+        ],
+        'back' => [
+            ['l_hip', 'l_knee'], ['l_knee', 'l_ankle'],
+            ['r_hip', 'r_knee'], ['r_knee', 'r_ankle'],
+        ],
+        'right_side' => [
+            ['r_ear', 'r_shoulder'], ['r_shoulder', 'r_hip'],
+            ['r_hip', 'r_knee'], ['r_knee', 'r_ankle'], ['r_ankle', 'r_foot'],
+        ],
+        'left_side' => [
+            ['l_ear', 'l_shoulder'], ['l_shoulder', 'l_hip'],
+            ['l_hip', 'l_knee'], ['l_knee', 'l_ankle'], ['l_ankle', 'l_foot'],
+        ],
+    ];
+
+    /** Marker diameter (px) drawn on each landmark. */
+    private const OV_MARKER = 6.0;
+
     /**
      * Measurement row codes drawn beside each anatomical label.
      *
@@ -176,32 +291,71 @@ class SpariskReportPdfService
             }
 
             $dark = [0.039, 0.235, 0.314];
+            $navy = [0.039, 0.180, 0.322];
+            $hair = [0.843, 0.898, 0.918];
+            $white = [1, 1, 1];
             $grey = [0.392, 0.455, 0.545];
             $left = 28.5;
-            $pageWidth = 595.28;
+            $right = 595.28 - 28.5;
+
+            // SATA badge: "SATA" over "POSTURE ANALYSIS" in a navy block at the
+            // left of the running head, with the report title beside it.
+            $badgeX = $left;
+            $badgeY = 6.0;
+            $badgeH = 30.0;
+            $badgePadX = 10.0;
+            $sataText = 'SATA';
+            $sataSize = 13.5;
+            $sataY = $badgeY + 4.0;
+            $subText = 'POSTURE ANALYSIS';
+            $subSize = 6.0;
+            $subY = $badgeY + 19.5;
+
+            $badgeW = max(
+                $metrics->getTextWidth($sataText, $bold, $sataSize),
+                $metrics->getTextWidth($subText, $bold, $subSize),
+            ) + ($badgePadX * 2);
 
             $title = 'POSTURE REPORT — Full Posture';
-            $titleSize = 12.5;
+            $titleSize = 13.0;
+            $titleX = $badgeX + $badgeW + 14.0;
+            // Centre the title on the badge's vertical midpoint.
+            $titleY = ($badgeY + ($badgeH / 2)) - ($titleSize * 0.6);
+
             $dateLine = 'Date: '.$data['assessment']['date'];
             $byLine = 'Generated by: SPARISK · '.$data['generated_at'];
+            $metaY = $badgeY + $badgeH + 7.0;
+            $byX = $right - $metrics->getTextWidth($byLine, $regular, 8.0);
+            $headRuleY = 54.0;
 
-            // Canvas::text() anchors the *top* of the line box at $y and the box
-            // is ~1.16× the font size tall, so the y values below leave
-            // deliberate gaps rather than colliding.
-            $titleX = max($left, ($pageWidth - $metrics->getTextWidth($title, $bold, $titleSize)) / 2);
+            $footRuleY = 800.0;
+            $footY = 806.0;
+            // Right-align the counter against the widest it can get, so the
+            // numbers line up down the page instead of drifting.
+            $pageNumX = $right - $metrics->getTextWidth('Page 88 of 88', $regular, 7);
 
             $canvas->page_script(function ($pageNumber, $pageCount, $canvas) use (
-                $regular, $bold, $dark, $grey, $left,
-                $title, $titleX, $titleSize, $dateLine, $byLine
+                $regular, $bold, $dark, $navy, $hair, $white, $grey, $left, $right,
+                $badgeX, $badgeY, $badgeW, $badgeH, $sataText, $sataSize, $sataY,
+                $subText, $subSize, $subY, $badgePadX,
+                $title, $titleX, $titleY, $titleSize, $dateLine, $byLine, $metaY, $byX,
+                $headRuleY, $footRuleY, $footY, $pageNumX
             ) {
-                // Page head (in the top page margin): centred title + date/byline.
-                $canvas->text($titleX, 10, $title, $bold, $titleSize, $dark, 0, 0);
-                $canvas->text($left, 28, $dateLine, $bold, 8.5, $dark, 0, 0);
-                $canvas->text(150, 28, $byLine, $regular, 8.5, $grey, 0, 0);
+                // Page head: SATA badge, report title, then the date / byline.
+                $canvas->filled_rectangle($badgeX, $badgeY, $badgeW, $badgeH, $navy);
+                $canvas->text($badgeX + $badgePadX, $sataY, $sataText, $bold, $sataSize, $white, 0, 0);
+                $canvas->text($badgeX + $badgePadX, $subY, $subText, $bold, $subSize, $white, 0, 0);
+                $canvas->text($titleX, $titleY, $title, $bold, $titleSize, $dark, 0, 0);
 
-                // Footer (in the bottom page margin).
-                $canvas->text($left, 804, 'SPARISK · SATA NeuroPosture', $regular, 7, $grey, 0, 0);
-                $canvas->text(508, 804, "Page {$pageNumber} of {$pageCount}", $regular, 7, $grey, 0, 0);
+                $canvas->text($left, $metaY, $dateLine, $bold, 8.0, $dark, 0, 0);
+                $canvas->text($byX, $metaY, $byLine, $regular, 8.0, $grey, 0, 0);
+
+                $canvas->line($left, $headRuleY, $right, $headRuleY, $hair, 0.8);
+
+                // Page foot: brand line, then the page counter.
+                $canvas->line($left, $footRuleY, $right, $footRuleY, $hair, 0.8);
+                $canvas->text($left, $footY, 'SPARISK · SATA NeuroPosture', $regular, 7, $grey, 0, 0);
+                $canvas->text($pageNumX, $footY, "Page {$pageNumber} of {$pageCount}", $regular, 7, $grey, 0, 0);
             });
         } catch (\Throwable) {
             // The chrome is cosmetic; it must never break the download.
@@ -430,6 +584,7 @@ class SpariskReportPdfService
                         'name' => $name,
                         'value' => $this->formatDegree($m->value),
                         'status' => $statusMeta['label'],
+                        'correction' => $statusMeta['correction'] ?? $statusMeta['label'],
                         'color' => self::STATUS_HEX[$statusMeta['color']] ?? self::STATUS_HEX['grey'],
                         'note' => $m->position_note ?: $m->status_text,
                     ];
@@ -464,11 +619,13 @@ class SpariskReportPdfService
             }
 
             $mime = str_ends_with(strtolower($image->image_path), '.png') ? 'image/png' : 'image/jpeg';
+            $photo = $this->photoOverlay($image, $key);
 
             $images[$key] = [
                 'label' => $names[$key],
                 'data' => 'data:'.$mime.';base64,'.base64_encode(Storage::disk('public')->get($image->image_path)),
-            ] + $this->photoOverlay($image, $key);
+                'overlay' => $this->poseOverlay($image, $key, $photo),
+            ] + $photo;
         }
 
         return $images;
@@ -604,6 +761,231 @@ class SpariskReportPdfService
             'img_left' => $gutter,
             'img_w' => $width,
             'levels' => $levels,
+        ];
+    }
+
+    /**
+     * APECS pose overlay geometry for one posture photo.
+     *
+     * The app uploads the MediaPipe landmarks normalised to the photo, so the
+     * grid, the plumb line, the alignment line, the segment lines and the
+     * markers can be placed exactly where the body was measured. Every value
+     * comes back as a point (or a rotated strip) inside the same positioned box
+     * the anatomical labels are laid out in, which lets the Blade template draw
+     * each element with a plain CSS border — dompdf then emits real vector
+     * operators, so the overlay stays sharp at any zoom instead of being
+     * flattened into the photo.
+     *
+     * An empty array means "no usable landmarks", and the caller falls back to
+     * the photo-only layout.
+     */
+    private function poseOverlay(AssessmentImage $image, string $view, array $photo): array
+    {
+        $landmarks = (array) ($image->landmarks ?? []);
+
+        if (count($landmarks) < 29 || ! isset($photo['img_left'], $photo['img_w'], $photo['box_h'])) {
+            return [];
+        }
+
+        $imgLeft = (float) $photo['img_left'];
+        $imgW = (float) $photo['img_w'];
+        $imgH = (float) $photo['box_h'];
+
+        // Normalized (0..1) photo coordinates to points inside the box.
+        $px = fn (float $nx): float => round($imgLeft + ($nx * $imgW), 1);
+        $py = fn (float $ny): float => round($ny * $imgH, 1);
+
+        $at = function (string $name) use ($landmarks): ?array {
+            $index = self::LM[$name] ?? null;
+            $point = $index === null ? null : ($landmarks[$index] ?? null);
+
+            if (! is_array($point) || ! isset($point['x'], $point['y'])) {
+                return null;
+            }
+
+            return [(float) $point['x'], (float) $point['y']];
+        };
+
+        $mid = function (?array $a, ?array $b): ?array {
+            if ($a === null) {
+                return $b;
+            }
+            if ($b === null) {
+                return $a;
+            }
+
+            return [($a[0] + $b[0]) / 2, ($a[1] + $b[1]) / 2];
+        };
+
+        $side = in_array($view, self::MIRRORED_VIEWS, true);
+        $pre = $view === 'left_side' ? 'l_' : 'r_';
+
+        // The plumb line hangs from the point under the body — the midpoint
+        // between the ankles upright, the visible ankle in profile.
+        $feet = $side ? $at($pre.'ankle') : $mid($at('l_ankle'), $at('r_ankle'));
+
+        if ($feet === null) {
+            return [];
+        }
+
+        $plumbX = $px($feet[0]);
+
+        $overlay = [
+            'grid_v' => [],
+            'grid_h' => [],
+            'plumb' => ['left' => $plumbX],
+            'align' => null,
+            'levels' => [],
+            'segments' => [],
+            'markers' => [],
+            'angle' => '',
+        ];
+
+        // ---- Grid: one cell size in every view, so the scales compare ----
+        $cell = $imgH / self::OV_GRID_ROWS;
+
+        for ($x = $cell; $x < $imgW - ($cell / 2); $x += $cell) {
+            $overlay['grid_v'][] = round($imgLeft + $x, 1);
+        }
+
+        for ($y = $cell; $y < $imgH - ($cell / 2); $y += $cell) {
+            $overlay['grid_h'][] = round($y, 1);
+        }
+
+        // ---- Red alignment line: head centre down to the feet ----
+        $head = $side ? $at($pre.'ear') : $mid($at('l_ear'), $at('r_ear'));
+
+        if ($head !== null) {
+            $overlay['align'] = $this->overlayLine($px($head[0]), $py($head[1]), $plumbX, $py($feet[1]));
+
+            // The deviation the report quotes is the line's tilt off vertical,
+            // measured in the photo's own (undistorted) space.
+            $overlay['angle'] = $this->formatDegree(
+                rad2deg(atan2($feet[0] - $head[0], $feet[1] - $head[1]))
+            );
+        }
+
+        // ---- Orange levels, one line per measured row ----
+        if ($side) {
+            $bones = ['shoulder' => 'ear', 'hip' => 'shoulder', 'knee' => 'hip', 'ankle' => 'knee', 'foot' => 'ankle'];
+
+            foreach (self::OV_LEVELS_SIDE as [$label, $part]) {
+                $point = $at($pre.$part);
+
+                if ($point === null) {
+                    continue;
+                }
+
+                $x = $px($point[0]);
+                $y = $py($point[1]);
+
+                $origin = $at($pre.($bones[$part] ?? ''));
+
+                $overlay['levels'][] = [
+                    'label' => $label,
+                    'left' => round(min($x, $plumbX), 1),
+                    'top' => $y,
+                    'width' => round(abs($x - $plumbX), 1),
+                    'angle' => 0.0,
+                    'deg' => $origin === null ? '' : $this->formatDegree(abs(
+                        rad2deg(atan2($point[0] - $origin[0], abs($point[1] - $origin[1]) ?: 1e-6))
+                    )),
+                ];
+
+                $overlay['markers'][$label] = ['left' => round($x - (self::OV_MARKER / 2), 1), 'top' => round($y - (self::OV_MARKER / 2), 1)];
+            }
+        } else {
+            foreach (self::OV_LEVELS_UPRIGHT[$view] ?? [] as [$label, $leftRef, $rightRef]) {
+                $pl = $this->overlayLevelPoint($leftRef, 'l_', $at ?: null, $landmarks);
+                $pr = $this->overlayLevelPoint($rightRef, 'r_', $at ?: null, $landmarks);
+
+                if ($pl === null || $pr === null) {
+                    continue;
+                }
+
+                $line = $this->overlayLine($px($pl[0]), $py($pl[1]), $px($pr[0]), $py($pr[1]));
+
+                $overlay['levels'][] = [
+                    'label' => $label,
+                    'left' => $line['left'],
+                    'top' => $line['top'],
+                    'width' => $line['width'],
+                    'angle' => $line['angle'],
+                    'deg' => $this->formatDegree(abs(rad2deg(atan2($pr[1] - $pl[1], $pr[0] - $pl[0])))),
+                ];
+
+                $overlay['markers'][$label.'_l'] = ['left' => round($px($pl[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($pl[1]) - (self::OV_MARKER / 2), 1)];
+                $overlay['markers'][$label.'_r'] = ['left' => round($px($pr[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($pr[1]) - (self::OV_MARKER / 2), 1)];
+            }
+        }
+
+        // ---- Blue bone segments ----
+        foreach (self::OV_SEGMENTS[$view] ?? [] as [$from, $to]) {
+            $a = $at($from);
+            $b = $at($to);
+
+            if ($a === null || $b === null) {
+                continue;
+            }
+
+            $overlay['segments'][] = $this->overlayLine($px($a[0]), $py($a[1]), $px($b[0]), $py($b[1]));
+            $overlay['markers'][$from] = ['left' => round($px($a[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($a[1]) - (self::OV_MARKER / 2), 1)];
+            $overlay['markers'][$to] = ['left' => round($px($b[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($b[1]) - (self::OV_MARKER / 2), 1)];
+        }
+
+        $overlay['markers'] = array_values($overlay['markers']);
+
+        // Grid goes first and markers last, so the template can emit the
+        // layers in the order the reference plates stack them.
+        return $overlay;
+    }
+
+    /**
+     * A level's two endpoints for the upright views.
+     *
+     * A plain landmark name resolves directly. An `@0.30` entry has no
+     * landmark of its own (the ribcage, the axillae), so it is interpolated
+     * that fraction of the way from the shoulder down to the hip on that side.
+     */
+    private function overlayLevelPoint(string $ref, string $prefix, ?callable $at, array $landmarks): ?array
+    {
+        if (! str_starts_with($ref, '@')) {
+            return $at === null ? null : $at($ref);
+        }
+
+        $index = fn (string $name) => self::LM[$name] ?? null;
+
+        $shoulder = $landmarks[$index($prefix.'shoulder') ?? -1] ?? null;
+        $hip = $landmarks[$index($prefix.'hip') ?? -1] ?? null;
+
+        if (! is_array($shoulder) || ! is_array($hip) || ! isset($shoulder['x'], $shoulder['y'], $hip['x'], $hip['y'])) {
+            return null;
+        }
+
+        $t = (float) substr($ref, 1);
+
+        return [
+            (float) $shoulder['x'] + (((float) $hip['x'] - (float) $shoulder['x']) * $t),
+            (float) $shoulder['y'] + (((float) $hip['y'] - (float) $shoulder['y']) * $t),
+        ];
+    }
+
+    /**
+     * A line as a horizontal strip plus the rotation that aims it at its
+     * endpoint. Dompdf pivots the strip about its top-left corner, so the
+     * rotation is measured from the +x axis to the (dx, dy) rise of the page,
+     * whose y axis points down.
+     */
+    private function overlayLine(float $x1, float $y1, float $x2, float $y2): array
+    {
+        $dx = $x2 - $x1;
+        $dy = $y2 - $y1;
+
+        return [
+            'left' => round($x1, 1),
+            'top' => round($y1, 1),
+            'width' => round(sqrt(($dx * $dx) + ($dy * $dy)), 1),
+            'angle' => round(rad2deg(atan2($dy, $dx)), 2),
         ];
     }
 

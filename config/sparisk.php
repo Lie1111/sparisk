@@ -148,11 +148,11 @@ return [
     | (missing landmark, impossible angle, missing reference).
     */
     'alignment_statuses' => [
-        'normal'   => ['label' => 'Aligned',              'color' => 'green'],
-        'mild'     => ['label' => 'Slightly Misaligned',  'color' => 'yellow'],
-        'moderate' => ['label' => 'Misaligned',           'color' => 'orange'],
-        'severe'   => ['label' => 'Clearly Misaligned',   'color' => 'red'],
-        'review'   => ['label' => 'Check Measurement',    'color' => 'grey'],
+        'normal'   => ['label' => 'Aligned',              'color' => 'green',  'correction' => 'ON POINT'],
+        'mild'     => ['label' => 'Slightly Misaligned',  'color' => 'yellow', 'correction' => 'MINOR CORRECTION'],
+        'moderate' => ['label' => 'Misaligned',           'color' => 'orange', 'correction' => 'CORRECTION NEEDED'],
+        'severe'   => ['label' => 'Clearly Misaligned',   'color' => 'red',    'correction' => 'PRIORITY CORRECTION'],
+        'review'   => ['label' => 'Check Measurement',    'color' => 'grey',   'correction' => 'REVIEW'],
     ],
 
     /*
