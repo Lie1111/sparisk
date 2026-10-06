@@ -46,8 +46,21 @@ const TYPE_DEFAULT_COLOR: Record<string, string> = {
     normal: '#94a3b8',
 };
 
-const markerColor = (m: { type?: string; color?: string | null }) =>
-    m.color && m.color.trim() ? m.color : (TYPE_DEFAULT_COLOR[m.type ?? 'tight'] ?? '#94a3b8');
+// The result severity drives the highlight colour so a problem area reads at a
+// glance: moderate = orange, severe = red. Normal keeps the tight (yellow) /
+// weak (green) muscle colours, and an explicit colour still applies there.
+const SEVERITY_COLOR: Record<string, string> = {
+    moderate: '#f97316', // orange
+    severe: '#ef4444', // red
+};
+
+const severityColor = (severity?: string | null) => SEVERITY_COLOR[(severity ?? '').trim().toLowerCase()];
+
+const markerColor = (m: { type?: string; color?: string | null; severity?: string }) => {
+    const severity = severityColor(m.severity);
+    if (severity) return severity;
+    return m.color && m.color.trim() ? m.color : (TYPE_DEFAULT_COLOR[m.type ?? 'tight'] ?? '#94a3b8');
+};
 
 const VIEW_LABELS: Record<string, string> = {
     front: 'Front View',
