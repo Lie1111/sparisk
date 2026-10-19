@@ -75,6 +75,11 @@ class Patient extends Model
         return $this->hasMany(PostureAssessment::class);
     }
 
+    public function skillAssessments(): HasMany
+    {
+        return $this->hasMany(SkillAssessment::class);
+    }
+
     public function progressRecords(): HasMany
     {
         return $this->hasMany(ProgressRecord::class);

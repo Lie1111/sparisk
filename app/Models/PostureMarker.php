@@ -30,6 +30,40 @@ class PostureMarker extends Model
         'is_active' => 'boolean',
     ];
 
+    protected $appends = ['status_label', 'regions'];
+
+    /**
+     * The measurement regions that grade this muscle, so the app can colour it
+     * from the stored findings instead of one band for the whole photo.
+     *
+     * @return array<int, string>
+     */
+    public function getRegionsAttribute(): array
+    {
+        $map = config("sparisk.marker_regions.{$this->view}", []);
+
+        return array_values($map[$this->label] ?? []);
+    }
+
+    /**
+     * The single label this marker prints — the same word on the patient body
+     * view, in the marker detail sheet and in the admin list. The highlight
+     * colour carries the severity band, so the label names the muscle state.
+     */
+    public function getStatusLabelAttribute(): string
+    {
+        $severity = strtolower((string) $this->severity);
+        $type = strtolower((string) $this->type);
+
+        $labels = config("sparisk.marker_status_labels.{$severity}");
+
+        if (is_array($labels) && isset($labels[$type])) {
+            return $labels[$type];
+        }
+
+        return ucfirst($severity !== '' ? $severity : 'normal');
+    }
+
     /**
      * Ordered markers, grouped by view, for the mobile app / editor.
      *
@@ -67,6 +101,8 @@ class PostureMarker extends Model
                 'severity' => $marker->severity,
                 'type' => $marker->type,
                 'color' => $marker->color,
+                'status_label' => $marker->status_label,
+                'regions' => $marker->regions,
                 'label' => $marker->label,
                 'muscle' => $marker->muscle,
                 'x' => $marker->x,

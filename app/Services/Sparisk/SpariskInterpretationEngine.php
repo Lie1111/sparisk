@@ -19,23 +19,43 @@ class SpariskInterpretationEngine
     public function interpret(PostureAssessment $assessment): array
     {
         $statuses = config('sparisk.alignment_statuses');
+        $outputStatuses = config('sparisk.posture_output_statuses');
 
         return $assessment->measurements()->get()
-            ->map(function (PostureMeasurement $m) use ($statuses) {
+            ->map(function (PostureMeasurement $m) use ($statuses, $outputStatuses) {
                 $status = $this->resolveStatus($m);
                 $meta = $statuses[$status] ?? $statuses['review'];
+                $statusCode = $this->resolveStatusCode($m, $status);
+                $outputMeta = $outputStatuses[$statusCode] ?? $outputStatuses['review'];
 
                 return [
                     'section' => $m->section,
                     'view' => $m->view,
                     'label' => $m->label,
+                    // The body region this reading grades, so a muscle marker
+                    // can be coloured from the worst finding in its region.
+                    'region' => config("sparisk.measurements.{$m->section}.region"),
+                    // Raw anatomical angle, kept for the database/audit trail only.
                     'value' => (float) $m->value,
+                    'measured_angle' => $m->measured_angle !== null ? (float) $m->measured_angle : (float) $m->value,
+                    // SATA user-facing output: the deviation from the applicable reference.
+                    'deviation_angle' => $m->deviation_angle !== null ? (float) $m->deviation_angle : null,
                     'reference_value' => $m->reference_value !== null ? (float) $m->reference_value : null,
                     'deviation' => $m->deviation !== null ? (float) $m->deviation : null,
                     'deviation_direction' => $m->deviation_direction,
                     'alignment_status' => $status,
                     'alignment_label' => $meta['label'],
                     'alignment_color' => $meta['color'],
+                    'status_code' => $statusCode,
+                    'status_label' => $outputMeta['label'],
+                    'status_color' => $outputMeta['color'],
+                    'status_correction' => $outputMeta['correction'],
+                    'reference_source' => $m->reference_source,
+                    'reference_level' => $m->reference_level,
+                    'tolerance' => $this->measurementEngine->toleranceFor($m),
+                    'age_group' => $m->age_group,
+                    'sex_if_required' => $m->sex_if_required,
+                    'posture_classification' => $m->posture_classification,
                     'position_note' => $m->position_note,
                     'interpretation' => $this->describe($m, $status),
                     'review_required' => (bool) $m->review_required,
@@ -58,9 +78,27 @@ class SpariskInterpretationEngine
                 $details = $interpreted->get($m->section);
 
                 return array_merge($m->toArray(), [
+                    // The body region this reading grades. The presentation
+                    // layers colour a muscle from the worst finding in its
+                    // region, so this has to travel with every payload the app
+                    // reads — `interpret()` sets it for the save response, and
+                    // dropping it here is what left the app's character view
+                    // showing every muscle as normal.
+                    'region' => $details['region'] ?? null,
                     'alignment_status' => $details['alignment_status'] ?? $m->alignment_status,
                     'alignment_label' => $details['alignment_label'] ?? null,
                     'alignment_color' => $details['alignment_color'] ?? null,
+                    'status_code' => $details['status_code'] ?? $m->status_code,
+                    'status_label' => $details['status_label'] ?? null,
+                    'status_color' => $details['status_color'] ?? null,
+                    'status_correction' => $details['status_correction'] ?? null,
+                    'deviation_angle' => $details['deviation_angle'] ?? $m->deviation_angle,
+                    'reference_value' => $details['reference_value'] ?? $m->reference_value,
+                    'reference_source' => $details['reference_source'] ?? $m->reference_source,
+                    'reference_level' => $details['reference_level'] ?? $m->reference_level,
+                    'tolerance' => $details['tolerance'] ?? $this->measurementEngine->toleranceFor($m),
+                    'age_group' => $details['age_group'] ?? $m->age_group,
+                    'sex_if_required' => $details['sex_if_required'] ?? $m->sex_if_required,
                     'position_note' => $details['position_note'] ?? $m->position_note,
                     'interpretation' => $details['interpretation'] ?? $m->status_text,
                     'review_required' => (bool) $m->review_required,
@@ -116,8 +154,26 @@ class SpariskInterpretationEngine
             'asymmetry_flag' => (bool) $assessment->asymmetry_flag,
             'confidence_level' => $assessment->confidence_level,
             'confidence_label' => $this->confidenceLabel($assessment->confidence_level, $isUnclassified),
+            // Plain-language reason produced by the decision engine, so every
+            // layer names the pattern that was actually suspected instead of a
+            // hardcoded one.
+            'explanation' => $isUnclassified ? $this->unclassifiedExplanation($assessment) : null,
             'classifications' => $this->enrichClassifications($assessment),
         ];
+    }
+
+    /**
+     * The decision engine's plain-language explanation for an unclassified
+     * posture, taken from the stored primary classification so the wording
+     * always matches the pattern the engine actually suspected.
+     */
+    private function unclassifiedExplanation(PostureAssessment $assessment): string
+    {
+        $primary = $assessment->classifications
+            ->firstWhere('classification_type', 'primary');
+
+        return $primary?->description
+            ?: 'The measurements do not clearly point to a single posture pattern. Measurement review is required.';
     }
 
     /**
@@ -268,7 +324,7 @@ class SpariskInterpretationEngine
 
         if ($review->isNotEmpty()) {
             $sentences[] = sprintf(
-                '%d of %d measurements need review before the posture can be confirmed.',
+                '%d of %d measurements need review before a posture pattern can be suggested.',
                 $review->count(),
                 $total
             );
@@ -343,6 +399,80 @@ class SpariskInterpretationEngine
     }
 
     /**
+     * Plain-language statement of the patient's posture problem, together with
+     * the individual problem areas behind it.
+     *
+     * The wording is derived entirely from the decision result already stored on
+     * the assessment (the confirmed classification or the suspected / secondary
+     * patterns) plus the reliability-filtered measurements. It never invents a
+     * cut-off: only the alignment statuses and deviation angles that the
+     * measurement and decision engines already produced are read.
+     */
+    public function patientProblem(PostureAssessment $assessment): array
+    {
+        $unclassified = config('sparisk.unclassified');
+        $isUnclassified = $assessment->posture_classification === $unclassified['code']
+            || $assessment->review_status === $unclassified['review_status'];
+
+        $problems = $this->problemAreas($assessment);
+
+        if ($isUnclassified) {
+            $sentences = ['No single posture pattern could be identified from the measurements available.'];
+            $suspected = $this->patternTokenLabel($assessment->suspected_pattern);
+            if ($suspected !== null) {
+                $sentences[] = "The strongest sign currently points to {$suspected}.";
+            }
+        } else {
+            $label = $this->patternLabel($assessment->posture_classification)
+                ?? ucwords(strtolower(str_replace('_', ' ', (string) $assessment->posture_classification)));
+            $sentences = ["The assessment indicates {$label}."];
+        }
+
+        if ($problems === []) {
+            $sentences[] = 'No posture deviation reached the reporting threshold in the measurements available.';
+        } else {
+            $areas = implode(', ', array_unique(array_column($problems, 'area')));
+            $sentences[] = "The main problem areas are {$areas}.";
+        }
+
+        return [
+            'summary' => implode(' ', $sentences),
+            'problems' => $problems,
+        ];
+    }
+
+    /**
+     * The reliability-filtered measurements that have deviated, ordered by the
+     * size of the deviation. This is the structured half of `patientProblem()`.
+     */
+    private function problemAreas(PostureAssessment $assessment): array
+    {
+        $statuses = config('sparisk.alignment_statuses');
+
+        return $assessment->measurements()
+            ->where('review_required', false)
+            ->whereIn('alignment_status', ['mild', 'moderate', 'severe'])
+            ->orderByDesc('deviation')
+            ->limit(5)
+            ->get()
+            ->map(function (PostureMeasurement $m) use ($statuses) {
+                $status = $m->alignment_status ?? 'normal';
+
+                return [
+                    'section' => $m->section,
+                    'view' => $m->view,
+                    'area' => $m->label,
+                    'severity' => $status,
+                    'severity_label' => $statuses[$status]['label'] ?? ucfirst($status),
+                    'deviation_angle' => $m->deviation_angle !== null ? (float) $m->deviation_angle : null,
+                    'direction' => $m->deviation_direction,
+                    'finding' => $this->describe($m, $status),
+                ];
+            })
+            ->toArray();
+    }
+
+    /**
      * Calculate trend between two assessments.
      */
     public function calculateTrend(PostureAssessment $current, PostureAssessment $previous): array
@@ -385,6 +515,25 @@ class SpariskInterpretationEngine
         }
 
         return $m->alignment_status ?? $m->severity ?? 'normal';
+    }
+
+    /**
+     * Resolve the SATA user-facing output status (on_point / near_point /
+     * off_point / baseline_tracking / review). Stored rows carry the status code
+     * written by the measurement engine; legacy rows fall back through the
+     * documented level→status mapping so no arbitrary cut-off is invented.
+     */
+    private function resolveStatusCode(PostureMeasurement $m, string $status): string
+    {
+        if ($m->review_required) {
+            return 'review';
+        }
+
+        if ($m->status_code !== null) {
+            return $m->status_code;
+        }
+
+        return config('sparisk.level_to_status')[$status] ?? 'review';
     }
 
     /**

@@ -52,9 +52,12 @@ class SpariskReportPdfService
     ];
 
     /** Display height of a posture photo and the label gutter beside it (pt). */
-    private const PHOTO_HEIGHT = 430.0;
+    private const PHOTO_HEIGHT = 360.0;
 
     private const PHOTO_GUTTER = 62.0;
+
+    /** Usable width inside the A4 page margins (595.28 - 38 - 38 pt). */
+    private const CONTENT_WIDTH = 519.0;
 
     /** Label width, the gap before a leader line, and the dot that ends it (pt). */
     private const LABEL_WIDTH = 58.0;
@@ -217,9 +220,66 @@ class SpariskReportPdfService
         'left_side' => ['Head' => 'D2', 'Chest' => 'D3', 'Hip' => 'D4', 'Thigh' => 'D5', 'Calf' => 'D6'],
     ];
 
+    /**
+     * The measurement row behind each printed overlay angle.
+     *
+     * The overlay draws geometry (lines, markers, plumb) from the landmarks,
+     * but every number it prints is the stored deviation angle of the row this
+     * map points at — the same value the report table shows for that row. The
+     * photo and the table therefore cannot quote two different readings.
+     */
+    private const OV_ALIGNMENT_SECTION = [
+        'front' => 'A1',
+        'back' => 'B1',
+        'right_side' => 'C1',
+        'left_side' => 'D1',
+    ];
+
+    /**
+     * Overlay level label → the section codes that level line reports. Paired
+     * entries (the two front knees, the two feet) print both sides at once.
+     */
+    private const OV_LEVEL_SECTIONS = [
+        'front' => [
+            'Head' => ['A2'],
+            'Acrom.' => ['A3'],
+            'Ribc.' => ['A5'],
+            'ASIS' => ['A7'],
+            'Knees' => ['A8', 'A9'],
+            'Feet' => ['A10', 'A11'],
+        ],
+        'back' => [
+            'Ears' => ['B2'],
+            'Shoulders' => ['B3'],
+            'Axillae' => ['B4'],
+            'Top of the curve' => ['B5'],
+            'PSIS' => ['B6'],
+            'Knees' => ['B7'],
+            'Feet' => ['B8'],
+        ],
+        'right_side' => [
+            'Head' => ['C2'],
+            'Shoulders' => ['C3'],
+            'Pelvis' => ['C4'],
+            'Femur' => ['C5'],
+            'Tibia' => ['C6'],
+            'Foot' => ['C7'],
+        ],
+        'left_side' => [
+            'Head' => ['D2'],
+            'Shoulders' => ['D3'],
+            'Pelvis' => ['D4'],
+            'Femur' => ['D5'],
+            'Tibia' => ['D6'],
+            'Foot' => ['D7'],
+        ],
+    ];
+
     public function __construct(
         private SpariskInterpretationEngine $interpreter,
         private SpariskBmiEngine $bmiEngine,
+        private SpariskMeasurementEngine $measurementEngine,
+        private AquaticSkillsProgressService $skillsProgress,
     ) {}
 
     public static function hex(?string $color): string
@@ -234,10 +294,14 @@ class SpariskReportPdfService
 
     /**
      * Serve the report as a download (attachment).
+     *
+     * The admin panel asks for the extended report, which appends the full
+     * per-view angle breakdown pages. The mobile app keeps the standard report
+     * (the default), so its document is unchanged.
      */
-    public function download(PostureAssessment $assessment): Response
+    public function download(PostureAssessment $assessment, bool $extended = false): Response
     {
-        $data = $this->buildData($assessment);
+        $data = $this->buildData($assessment, $extended);
         $pdf = $this->make($data);
         $this->stampChrome($pdf, $data);
 
@@ -247,9 +311,9 @@ class SpariskReportPdfService
     /**
      * Serve the report inline, so a browser can preview it.
      */
-    public function stream(PostureAssessment $assessment): Response
+    public function stream(PostureAssessment $assessment, bool $extended = false): Response
     {
-        $data = $this->buildData($assessment);
+        $data = $this->buildData($assessment, $extended);
         $pdf = $this->make($data);
         $this->stampChrome($pdf, $data);
 
@@ -364,8 +428,11 @@ class SpariskReportPdfService
 
     /**
      * Assemble everything the Blade template needs.
+     *
+     * `$extended` turns on the extra per-view angle breakdown pages. Only the
+     * admin panel requests them; the app's report stays exactly as it was.
      */
-    private function buildData(PostureAssessment $assessment): array
+    private function buildData(PostureAssessment $assessment, bool $extended = false): array
     {
         $assessment->load([
             'patient',
@@ -379,6 +446,7 @@ class SpariskReportPdfService
         $statuses = config('sparisk.alignment_statuses');
 
         return [
+            'extended' => $extended,
             'generated_at' => now()->format('d/m/Y H:i'),
             'patient' => $this->patientData($assessment),
             'bmi' => $this->bmiData($assessment),
@@ -398,7 +466,114 @@ class SpariskReportPdfService
             'exercises' => $this->exerciseData($assessment->exerciseRecommendations),
             'massages' => $assessment->massageRecommendations,
             'weekly' => $assessment->weeklyPrograms,
+            'skills' => $this->skillsData($assessment),
         ];
+    }
+
+    /**
+     * The patient's aquatic skills progress plus the line chart itself.
+     *
+     * The three charts are per patient, not per posture assessment, so the
+     * report shows every sitting the patient has on record.
+     *
+     * Dompdf drops the shapes of an inline <svg> element (only the inner
+     * <text> leaks into the flow), but it renders a standalone SVG document
+     * embedded through <img> as real vector operators, so the line chart is
+     * built here and handed to the template as a base64 data URI.
+     *
+     * @return array<string, mixed>
+     */
+    private function skillsData(PostureAssessment $assessment): array
+    {
+        $dashboard = $this->skillsProgress->forPatient($assessment->patient);
+        $sessions = $dashboard['sessions'];
+
+        $dashboard['chart'] = $sessions === [] ? null : [
+            'uri' => 'data:image/svg+xml;base64,'.base64_encode($this->lineChartSvg($sessions)),
+            'height' => 190.0,
+        ];
+
+        return $dashboard;
+    }
+
+    /**
+     * The overall-progress line chart as a standalone SVG document, sized to
+     * the report's content width in points.
+     *
+     * @param  array<int, array<string, mixed>>  $sessions
+     */
+    private function lineChartSvg(array $sessions): string
+    {
+        $width = self::CONTENT_WIDTH;
+        $height = 190.0;
+        $left = 36.0;
+        $right = 22.0;
+        $top = 18.0;
+        $bottom = 40.0;
+        $plotWidth = $width - $left - $right;
+        $plotHeight = $height - $top - $bottom;
+
+        $ceiling = max(1, ...array_map(fn (array $session) => (int) $session['max'], $sessions));
+        $count = count($sessions);
+
+        $x = function (int $index) use ($count, $left, $plotWidth): float {
+            return $count === 1
+                ? $left + ($plotWidth / 2)
+                : $left + (($index / ($count - 1)) * $plotWidth);
+        };
+        $y = fn (float $score): float => $top + (1 - ($score / $ceiling)) * $plotHeight;
+
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" width="'.$width.'" height="'.$height.'"'
+            .' viewBox="0 0 '.$width.' '.$height.'" font-family="DejaVu Sans">';
+        $svg .= '<rect x="0" y="0" width="'.$width.'" height="'.$height.'" fill="#FFFFFF"/>';
+
+        foreach ([0.0, 0.5, 1.0] as $fraction) {
+            $lineY = round($top + (1 - $fraction) * $plotHeight, 2);
+            $dash = $fraction === 0.0 ? '' : ' stroke-dasharray="3 3"';
+
+            $svg .= '<line x1="'.$left.'" y1="'.$lineY.'" x2="'.($width - $right).'" y2="'.$lineY.'"'
+                .' stroke="#E4EBEE" stroke-width="1"'.$dash.'/>';
+            $svg .= '<text x="'.($left - 6).'" y="'.($lineY + 3).'" font-size="8" text-anchor="end" fill="#64748B">'
+                .round($ceiling * $fraction).'</text>';
+        }
+
+        if ($count > 1) {
+            $points = [];
+            foreach ($sessions as $index => $session) {
+                $points[] = round($x($index), 2).','.round($y((float) $session['score']), 2);
+            }
+
+            $svg .= '<polyline points="'.implode(' ', $points).'" fill="none" stroke="#0E7C86"'
+                .' stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>';
+        }
+
+        // Thin the labels out so a long history never collides.
+        $labelEvery = max(1, (int) ceil($count / 6));
+
+        foreach ($sessions as $index => $session) {
+            $pointX = round($x($index), 2);
+            $pointY = round($y((float) $session['score']), 2);
+
+            $svg .= '<circle cx="'.$pointX.'" cy="'.$pointY.'" r="3.4" fill="#FFFFFF"'
+                .' stroke="#0E7C86" stroke-width="2"/>';
+
+            if ($count <= 8) {
+                $svg .= '<text x="'.$pointX.'" y="'.($pointY - 7).'" font-size="7.5" text-anchor="middle"'
+                    .' fill="#0A3C50">'.$session['score'].'/'.$session['max'].'</text>';
+            }
+
+            if ($index % $labelEvery === 0 || $index === $count - 1) {
+                $label = htmlspecialchars((string) $session['label'], ENT_QUOTES, 'UTF-8');
+                $date = htmlspecialchars((string) ($session['date'] ?? ''), ENT_QUOTES, 'UTF-8');
+
+                $svg .= '<text x="'.$pointX.'" y="'.($height - 22).'" font-size="7.5" text-anchor="middle"'
+                    .' fill="#64748B">'.$label.'</text>';
+                $svg .= '<text x="'.$pointX.'" y="'.($height - 12).'" font-size="6.5" text-anchor="middle"'
+                    .' fill="#94A3B8">'.$date.'</text>';
+            }
+        }
+
+        return $svg.'</svg>';
     }
 
     /**
@@ -552,6 +727,9 @@ class SpariskReportPdfService
     private function viewData(PostureAssessment $assessment, array $statuses): array
     {
         $views = [];
+        $outputStatuses = config('sparisk.posture_output_statuses');
+        $levelToStatus = config('sparisk.level_to_status');
+        $referenceLevels = config('sparisk.reference_levels');
 
         foreach (self::VIEWS as $key => $meta) {
             $lines = $this->measurementLines($key);
@@ -564,11 +742,21 @@ class SpariskReportPdfService
                 ->filter(fn (PostureMeasurement $m) => preg_match('/^[A-Z]\d+$/', (string) $m->section))
                 ->sort(fn (PostureMeasurement $a, PostureMeasurement $b) => strnatcasecmp((string) $a->section, (string) $b->section))
                 ->values()
-                ->map(function (PostureMeasurement $m) use ($statuses, $lines) {
+                ->map(function (PostureMeasurement $m) use ($lines, $levelToStatus, $outputStatuses, $referenceLevels) {
                     $status = $m->review_required ? 'review' : ($m->alignment_status ?? $m->severity ?? 'normal');
-                    $statusMeta = $statuses[$status] ?? $statuses['normal'];
+                    $statusCode = $m->review_required
+                        ? 'review'
+                        : ($m->status_code ?? ($levelToStatus[$status] ?? 'review'));
+                    $outputMeta = $outputStatuses[$statusCode] ?? $outputStatuses['review'];
                     $label = $m->label ?: (config("sparisk.measurements.{$m->section}.label") ?? $m->section);
                     $line = $lines[(string) $m->section] ?? '';
+
+                    // SATA output is DEVIATION ANGLE ONLY: the row reports the
+                    // deviation from the applicable reference, never the raw
+                    // anatomical angle. The marker code is printed only when the
+                    // same code is drawn on the photo, so the numbering on the
+                    // body and in the table can never disagree.
+                    $code = isset($lines[(string) $m->section]) ? (string) $m->section : '';
 
                     // Naming the row the way the photo labels it lets a reader
                     // find "Hip ( Estimated Pelvic Alignment )" from the line
@@ -579,13 +767,27 @@ class SpariskReportPdfService
                         ? $line.' ( '.$label.' )'
                         : $label;
 
+                    $reference = $m->reference_value !== null ? (float) $m->reference_value : null;
+                    $deviation = $m->deviation_angle !== null ? (float) $m->deviation_angle : null;
+                    $levelMeta = $referenceLevels[$m->reference_level] ?? null;
+                    $tolerance = $this->measurementEngine->toleranceFor($m);
+
                     return [
-                        'code' => preg_match('/^[A-Z]\d+$/', (string) $m->section) ? $m->section : '',
+                        'code' => $code,
+                        'section' => (string) $m->section,
                         'name' => $name,
-                        'value' => $this->formatDegree($m->value),
-                        'status' => $statusMeta['label'],
-                        'correction' => $statusMeta['correction'] ?? $statusMeta['label'],
-                        'color' => self::STATUS_HEX[$statusMeta['color']] ?? self::STATUS_HEX['grey'],
+                        'measured' => $this->formatDecimal($m->measured_angle ?? $m->value),
+                        'reference' => $reference !== null ? $this->formatDecimal($reference) : null,
+                        // The published half-width the On Point / Near Point /
+                        // Off Point bands are built from, so a reader can check
+                        // the status against the cut-off it was judged on.
+                        'tolerance' => $tolerance !== null ? $this->formatDecimal($tolerance) : null,
+                        'deviation' => $deviation !== null ? $this->formatSignedDecimal($deviation) : null,
+                        'reference_level' => $levelMeta['label'] ?? null,
+                        'is_baseline' => $m->reference_level === 'individual_baseline',
+                        'status' => $outputMeta['label'],
+                        'correction' => $outputMeta['correction'] ?? $outputMeta['label'],
+                        'color' => self::STATUS_HEX[$outputMeta['color']] ?? self::STATUS_HEX['grey'],
                         'note' => $m->position_note ?: $m->status_text,
                     ];
                 })
@@ -624,11 +826,57 @@ class SpariskReportPdfService
             $images[$key] = [
                 'label' => $names[$key],
                 'data' => 'data:'.$mime.';base64,'.base64_encode(Storage::disk('public')->get($image->image_path)),
-                'overlay' => $this->poseOverlay($image, $key, $photo),
+                'overlay' => $this->poseOverlay($image, $key, $photo, $this->deviationLabels($assessment, $key)),
             ] + $photo;
         }
 
         return $images;
+    }
+
+    /**
+     * The printed deviation of every stored row in a view, keyed by section —
+     * the exact text the report table prints, so the photo overlay can quote
+     * the same numbers instead of measuring the landmarks a second time.
+     */
+    private function deviationLabels(PostureAssessment $assessment, string $view): array
+    {
+        return $assessment->measurements
+            ->where('view', $view)
+            ->mapWithKeys(fn (PostureMeasurement $m) => [
+                (string) $m->section => $m->deviation_angle !== null
+                    ? $this->formatSignedDecimal($m->deviation_angle).'°'
+                    : null,
+            ])
+            ->filter(fn (?string $label) => $label !== null)
+            ->all();
+    }
+
+    /**
+     * The badge printed beside one overlay level: the deviation of the row(s)
+     * that level reports. Paired rows — the two front knees, the two feet —
+     * print both sides, in the order the table lists them.
+     */
+    private function levelDeviation(string $view, string $label, array $deviations): string
+    {
+        $codes = self::OV_LEVEL_SECTIONS[$view][$label] ?? [];
+        $values = array_values(array_filter(
+            array_map(fn (string $code) => $deviations[$code] ?? null, $codes),
+            fn (?string $value) => $value !== null,
+        ));
+
+        if ($values === []) {
+            return '';
+        }
+
+        if (count($values) === 1) {
+            return $values[0];
+        }
+
+        $sides = ['R', 'L'];
+
+        return collect($values)
+            ->map(fn (string $value, int $index) => trim(($sides[$index] ?? '').' '.$value))
+            ->implode(' · ');
     }
 
     /**
@@ -645,7 +893,7 @@ class SpariskReportPdfService
      * a dot. The line therefore points at the body part instead of crossing
      * the body, exactly like the reference plates.
      */
-    private function photoOverlay(AssessmentImage $image, string $view): array
+    private function photoOverlay(AssessmentImage $image, string $view, float $maxWidth = self::CONTENT_WIDTH): array
     {
         $size = @getimagesize(Storage::disk('public')->path($image->image_path));
 
@@ -712,7 +960,9 @@ class SpariskReportPdfService
                 : compact('left', 'right', 'top', 'bottom');
         }
 
-        $rows = [];
+        // Which gutter a label reads from decides how many gutters the box
+        // needs, so every side is resolved before the photo is sized.
+        $sides = [];
         $hasRight = false;
 
         foreach ($zones as $label => $zone) {
@@ -720,7 +970,25 @@ class SpariskReportPdfService
             // to the right gutter; anything on or before it reads from the
             // left, so the paired front/back zones stay together.
             $right = ($zone['left'] + $zone['right']) / 2 - 0.5 > 0.03;
+            $sides[$label] = $right;
             $hasRight = $hasRight || $right;
+        }
+
+        // The box — the photo plus its label gutters — has to fit the column
+        // the caller allows, so the photo is scaled down from its display
+        // height until the whole overlay fits that width. Scaling both sides
+        // together keeps the labels aligned with the body.
+        $maxImageWidth = round($maxWidth - $gutter - ($hasRight ? $gutter : 0), 1);
+
+        if ($maxImageWidth > 0 && $width > $maxImageWidth) {
+            $width = $maxImageWidth;
+            $height = round($width * $size[1] / $size[0], 1);
+        }
+
+        $rows = [];
+
+        foreach ($zones as $label => $zone) {
+            $right = $sides[$label];
 
             $rows[] = [
                 'label' => $label,
@@ -779,7 +1047,7 @@ class SpariskReportPdfService
      * An empty array means "no usable landmarks", and the caller falls back to
      * the photo-only layout.
      */
-    private function poseOverlay(AssessmentImage $image, string $view, array $photo): array
+    private function poseOverlay(AssessmentImage $image, string $view, array $photo, array $deviations = []): array
     {
         $landmarks = (array) ($image->landmarks ?? []);
 
@@ -857,18 +1125,15 @@ class SpariskReportPdfService
 
         if ($head !== null) {
             $overlay['align'] = $this->overlayLine($px($head[0]), $py($head[1]), $plumbX, $py($feet[1]));
-
-            // The deviation the report quotes is the line's tilt off vertical,
-            // measured in the photo's own (undistorted) space.
-            $overlay['angle'] = $this->formatDegree(
-                rad2deg(atan2($feet[0] - $head[0], $feet[1] - $head[1]))
-            );
         }
+
+        // The printed alignment is the stored Body Alignment deviation of this
+        // view, i.e. the row the reader sees in the table below the photo. The
+        // red line stays geometric: it shows where the body actually sits.
+        $overlay['angle'] = $deviations[self::OV_ALIGNMENT_SECTION[$view] ?? ''] ?? '';
 
         // ---- Orange levels, one line per measured row ----
         if ($side) {
-            $bones = ['shoulder' => 'ear', 'hip' => 'shoulder', 'knee' => 'hip', 'ankle' => 'knee', 'foot' => 'ankle'];
-
             foreach (self::OV_LEVELS_SIDE as [$label, $part]) {
                 $point = $at($pre.$part);
 
@@ -879,17 +1144,13 @@ class SpariskReportPdfService
                 $x = $px($point[0]);
                 $y = $py($point[1]);
 
-                $origin = $at($pre.($bones[$part] ?? ''));
-
                 $overlay['levels'][] = [
                     'label' => $label,
                     'left' => round(min($x, $plumbX), 1),
                     'top' => $y,
                     'width' => round(abs($x - $plumbX), 1),
                     'angle' => 0.0,
-                    'deg' => $origin === null ? '' : $this->formatDegree(abs(
-                        rad2deg(atan2($point[0] - $origin[0], abs($point[1] - $origin[1]) ?: 1e-6))
-                    )),
+                    'deg' => $this->levelDeviation($view, $label, $deviations),
                 ];
 
                 $overlay['markers'][$label] = ['left' => round($x - (self::OV_MARKER / 2), 1), 'top' => round($y - (self::OV_MARKER / 2), 1)];
@@ -911,7 +1172,7 @@ class SpariskReportPdfService
                     'top' => $line['top'],
                     'width' => $line['width'],
                     'angle' => $line['angle'],
-                    'deg' => $this->formatDegree(abs(rad2deg(atan2($pr[1] - $pl[1], $pr[0] - $pl[0])))),
+                    'deg' => $this->levelDeviation($view, $label, $deviations),
                 ];
 
                 $overlay['markers'][$label.'_l'] = ['left' => round($px($pl[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($pl[1]) - (self::OV_MARKER / 2), 1)];
@@ -1013,5 +1274,30 @@ class SpariskReportPdfService
     private function formatDegree(mixed $value): string
     {
         return rtrim(rtrim(number_format((float) $value, 1, '.', ''), '0'), '.');
+    }
+
+    /** Same as formatDegree; named for the deviation-angle output columns. */
+    private function formatDecimal(mixed $value): string
+    {
+        return $this->formatDegree($value);
+    }
+
+    /**
+     * A signed deviation angle: `0` at the reference, `+` above it and `-`
+     * below it, so the direction and magnitude of the deviation are explicit.
+     */
+    private function formatSignedDecimal(mixed $value): string
+    {
+        $value = (float) $value;
+
+        if ($value > 0) {
+            return '+'.$this->formatDegree($value);
+        }
+
+        if ($value < 0) {
+            return '-'.$this->formatDegree(abs($value));
+        }
+
+        return '0';
     }
 }

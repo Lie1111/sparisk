@@ -39,7 +39,7 @@
             <div class="ov-level" style="left: {{ $level['left'] }}pt; top: {{ $level['top'] }}pt; width: {{ $level['width'] }}pt; transform: rotate({{ $level['angle'] }}deg)"></div>
         @endif
         @if ($level['deg'] !== '')
-            <div class="ov-deg" style="left: {{ $level['left'] }}pt; top: {{ round($level['top'] - 10, 1) }}pt">{{ $level['deg'] }}°</div>
+            <div class="ov-deg" style="left: {{ $level['left'] }}pt; top: {{ round($level['top'] - 10, 1) }}pt">{{ $level['deg'] }}</div>
         @endif
     @endforeach
 
@@ -55,10 +55,10 @@
 
     {{-- Angle labels --}}
     @if ($ov['angle'] !== '')
-        <div class="ov-align-tag" style="left: {{ $photo['img_left'] }}pt; top: {{ round($photo['box_h'] - 13, 1) }}pt">Alignment {{ $ov['angle'] }}°</div>
+        <div class="ov-align-tag" style="left: {{ $photo['img_left'] }}pt; top: {{ round($photo['box_h'] - 13, 1) }}pt">Alignment {{ $ov['angle'] }}</div>
     @endif
     @if ($upright && $ov['angle'] !== '')
         <div class="ov-tag ov-tag-green" style="left: {{ round($ov['plumb']['left'] - 24, 1) }}pt; top: 2pt">0°</div>
-        <div class="ov-tag ov-tag-red" style="left: {{ round($ov['plumb']['left'] + 2, 1) }}pt; top: 2pt">{{ $ov['angle'] }}°</div>
+        <div class="ov-tag ov-tag-red" style="left: {{ round($ov['plumb']['left'] + 2, 1) }}pt; top: 2pt">{{ $ov['angle'] }}</div>
     @endif
 @endif

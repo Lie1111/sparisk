@@ -4,6 +4,16 @@ use App\Models\Patient;
 use App\Models\PostureAssessment;
 use App\Services\Sparisk\SpariskDecisionEngine;
 use App\Services\Sparisk\SpariskMeasurementEngine;
+use Database\Seeders\PostureSettingSeeder;
+
+/**
+ * The measurement engine resolves every reference through the SATA reference
+ * hierarchy stored in `posture_settings`, so the locked reference table must be
+ * present before a measurement can be scored.
+ */
+beforeEach(function () {
+    $this->seed(PostureSettingSeeder::class);
+});
 
 /**
  * Build an assessment from raw landmark angles and run the measurement engine.
@@ -56,8 +66,8 @@ it('returns UNCLASSIFIED with measurement review required when the pattern is no
     $assessment = sparisk_assessment([
         'A1' => 0.5, 'A2' => 0.4, 'A3' => 6.0, 'A4' => 0.5, 'A5' => 0.5, 'A6' => 0.5,
         'A7' => 0.8, 'A8' => -7.0, 'A9' => -1.0, 'A10' => 3.0, 'A11' => -3.0,
-        'C3' => 2.0, 'C4' => 8.0, 'C5' => 2.0,
-        'D3' => 1.0, 'D4' => 1.0,
+        'C3' => 2.0, 'C4' => -12.0, 'C5' => 2.0,
+        'D3' => 1.0, 'D4' => -12.0,
         'side_cva' => 50.0, 'side_kyphosis' => 40.0, 'side_lordosis' => 45.0,
     ]);
 
@@ -76,11 +86,16 @@ it('returns UNCLASSIFIED with measurement review required when the pattern is no
 });
 
 it('confirms kyphosis when the combined measurements clearly support the pattern', function () {
+    // At 19–49 the approved references are body alignment (C1/D1, 1.73°±0.94)
+    // and head posture (side_cva, 51.42°±4.87); shoulder (C3/D3) and pelvic tilt
+    // (C4/D4) track the individual baseline only. Forward trunk translation with
+    // a forward head therefore supports kyphosis, while C3/D3 — despite a marked
+    // reading — can never carry a population deviation.
     $assessment = sparisk_assessment([
         'A1' => 0.5, 'A2' => 0.4, 'A3' => 0.5,
         'A7' => 0.5, 'A8' => -1.0, 'A9' => -1.0,
-        'C3' => 12.0, 'C4' => 3.0, 'C5' => 1.0,
-        'D3' => 12.0, 'D4' => 1.0,
+        'C1' => 5.0, 'C3' => 12.0, 'C4' => -12.0, 'C5' => 1.0,
+        'D1' => 5.0, 'D3' => 12.0, 'D4' => -12.0,
         'side_cva' => 40.0, 'side_kyphosis' => 58.0, 'side_lordosis' => 45.0,
     ]);
 

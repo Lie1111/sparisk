@@ -5,6 +5,7 @@ namespace App\Services\Sparisk;
 use App\Models\PostureAssessment;
 use App\Models\PostureClassification;
 use App\Models\PostureMeasurement;
+use App\Models\PostureSetting;
 use Illuminate\Support\Collection;
 
 class SpariskDecisionEngine
@@ -12,7 +13,7 @@ class SpariskDecisionEngine
     /**
      * Ordering used to find the strongest alignment status inside a rule.
      */
-    private const LEVEL_RANK = ['normal' => 0, 'mild' => 1, 'moderate' => 2, 'severe' => 3];
+    private const LEVEL_RANK = ['baseline' => 0, 'normal' => 0, 'mild' => 1, 'moderate' => 2, 'severe' => 3];
 
     public function __construct(private SpariskInterpretationEngine $interpretationEngine) {}
 
@@ -32,12 +33,13 @@ class SpariskDecisionEngine
 
         $measurements = $assessment->measurements()->get()->keyBy('section');
         $dataQuality = $this->dataQuality($measurements);
+        $gapSections = $this->structuralGapSections($measurements);
 
         $symmetry = $this->interpretationEngine->generateSymmetry($assessment);
         $asymmetryFlag = collect($symmetry)->contains(fn (array $pair) => $pair['status'] !== 'symmetrical');
 
         $evaluations = collect(config('sparisk.decision_rules'))
-            ->map(fn (array $rule) => $this->evaluateRule($rule, $measurements, $dataQuality, $policy))
+            ->map(fn (array $rule) => $this->evaluateRule($rule, $measurements, $dataQuality, $policy, $gapSections))
             ->all();
 
         $confirmed = collect($evaluations)
@@ -113,7 +115,7 @@ class SpariskDecisionEngine
      * independent evidence and clears the configured confidence and data
      * quality guards.
      */
-    private function evaluateRule(array $rule, Collection $measurements, float $dataQuality, array $policy): array
+    private function evaluateRule(array $rule, Collection $measurements, float $dataQuality, array $policy, array $gapSections): array
     {
         $sections = $this->ruleSections($rule);
         $matchedSections = [];
@@ -157,20 +159,40 @@ class SpariskDecisionEngine
             }
         }
 
+        $nonePass = true;
+        if (!empty($rule['none'])) {
+            foreach ($rule['none'] as $condition) {
+                if ($this->conditionMatches($condition, $measurements)) {
+                    $nonePass = false;
+                    break;
+                }
+            }
+        }
+
         $hasConditions = !empty($rule['all']) || !empty($rule['any']) || !empty($rule['any2']);
-        $matched = $hasConditions && $allPass && $anyPass && $any2Pass;
+        $matched = $hasConditions && $allPass && $anyPass && $any2Pass && $nonePass;
 
         if ($rule['normal_when_no_deviation'] ?? false) {
-            $reliable = $measurements->filter(fn (PostureMeasurement $m) => !$m->review_required);
+            $reliable = $measurements->filter(
+                fn (PostureMeasurement $m) => $this->isReliable($m) && $m->alignment_status === 'normal'
+            );
             $matched = $reliable->isNotEmpty()
-                && $reliable->every(fn (PostureMeasurement $m) => $m->alignment_status === 'normal');
+                && $measurements->every(fn (PostureMeasurement $m) => $m->alignment_status === 'baseline' || $m->alignment_status === 'normal');
             $matchedSections = $reliable->keys()->all();
             $levels = ['normal'];
             $sections = $reliable->keys()->all();
         }
 
+        // A parameter that is a structural Evidence Gap (no approved Level 1 /
+        // Level 2 reference for this patient's age) can never carry a deviation,
+        // so it must not dilute the rule's confidence.
+        $expected = array_values(array_filter(
+            $sections,
+            fn (string $section) => !in_array($section, $gapSections, true)
+        ));
+
         $evidence = count($matchedSections);
-        $coverage = $sections === [] ? 1.0 : $evidence / count($sections);
+        $coverage = $expected === [] ? 1.0 : $evidence / count($expected);
         $confidence = round(min(100.0, $coverage * 100) * $dataQuality, 1);
 
         $confirmable = in_array($rule['classification'], config('sparisk.confirmable_classifications', []), true);
@@ -202,7 +224,7 @@ class SpariskDecisionEngine
             'matched' => $matched,
             'confirmable' => $confirmable,
             'evidence' => $evidence,
-            'expected_evidence' => count($sections),
+            'expected_evidence' => count($expected),
             'matched_sections' => array_values($matchedSections),
             'missing_sections' => $missing,
             'confidence' => $confidence,
@@ -234,14 +256,42 @@ class SpariskDecisionEngine
     }
 
     /**
-     * A measurement can only drive a decision when it was captured and did not
-     * need its landmark or angle verified.
+     * A measurement can only drive a decision when it was captured, did not
+     * need its landmark or angle verified, and carries an approved population
+     * deviation. An Evidence Gap reading is stored as `baseline` and only
+     * tracks change from the individual's first assessment, so it can never
+     * support a posture classification.
      */
     private function isReliable(?PostureMeasurement $measurement): bool
     {
         return $measurement !== null
             && !$measurement->review_required
-            && $measurement->alignment_status !== null;
+            && $measurement->alignment_status !== null
+            && $measurement->alignment_status !== 'baseline';
+    }
+
+    /**
+     * Sections that have no approved Level 1 / Level 2 reference for the
+     * patient's age group. Such a parameter can only track change from the
+     * individual's first assessment, so it can never carry a population
+     * deviation and must not dilute a rule's confidence or coverage.
+     */
+    private function structuralGapSections(Collection $measurements): array
+    {
+        $ageGroup = $measurements->first()?->age_group;
+
+        if ($ageGroup === null) {
+            return [];
+        }
+
+        $approved = PostureSetting::where('age_group', $ageGroup)
+            ->whereIn('reference_level', ['published', 'sata_validated'])
+            ->whereNotNull('reference_value')
+            ->pluck('section')
+            ->unique()
+            ->all();
+
+        return array_values(array_diff(array_keys(config('sparisk.measurements', [])), $approved));
     }
 
     private function recordMatch(string $section, Collection $measurements, array &$matchedSections, array &$levels): void
@@ -259,7 +309,7 @@ class SpariskDecisionEngine
     {
         $sections = $rule['requires'] ?? [];
 
-        foreach (['all', 'any', 'any2'] as $group) {
+        foreach (['all', 'any', 'any2', 'none'] as $group) {
             foreach ($rule[$group] ?? [] as $condition) {
                 $sections[] = $condition['section'];
             }
@@ -376,12 +426,12 @@ class SpariskDecisionEngine
         $reviewCount = $measurements->filter(fn (PostureMeasurement $m) => $m->review_required)->count();
 
         if ($measurements->isEmpty()) {
-            return 'No measurements were available, so no posture type can be confirmed. Measurement review is required.';
+            return 'No measurements were available, so no posture pattern can be suggested. Measurement review is required.';
         }
 
         if ($dataQuality < config('sparisk.classification_policy.min_data_quality')) {
             return sprintf(
-                '%d of %d measurements could not be validated. Measurement review is required before a posture type can be confirmed.',
+                '%d of %d measurements could not be validated. Measurement review is required before a posture pattern can be suggested.',
                 $reviewCount,
                 $measurements->count()
             );
@@ -389,12 +439,12 @@ class SpariskDecisionEngine
 
         if ($suspected) {
             return sprintf(
-                'The measurements do not support a single confirmable posture type. A %s pattern is suspected and needs review.',
+                'The measurements do not clearly point to a single posture pattern. A %s pattern is suspected and needs review.',
                 str_replace('_', ' ', strtolower($suspected['token']))
             );
         }
 
-        return 'The measurements do not support a single confirmable posture type. Measurement review is required.';
+        return 'The measurements do not clearly point to a single posture pattern. Measurement review is required.';
     }
 
     private function storeClassification(PostureAssessment $assessment, array $evaluation, string $type): PostureClassification

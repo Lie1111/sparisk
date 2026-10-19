@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class PostureAssessment extends Model
 {
     protected $fillable = [
-        'patient_id', 'health_screening_id', 'assessment_date',
+        'patient_id', 'health_screening_id', 'skill_assessment_id', 'assessment_date',
         'time_mark', 'overall_score', 'overall_status',
         'posture_classification', 'review_status',
         'suspected_pattern', 'secondary_pattern', 'asymmetry_flag',
-        'confidence_level', 'clinical_summary',
+        'confidence_level', 'clinical_summary', 'patient_problem',
         'primary_findings', 'need_attention', 'biggest_improvement',
         'overall_progress'
     ];
@@ -22,6 +22,7 @@ class PostureAssessment extends Model
         'assessment_date' => 'date',
         'overall_score' => 'integer',
         'asymmetry_flag' => 'boolean',
+        'patient_problem' => 'array',
     ];
 
     public function patient(): BelongsTo

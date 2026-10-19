@@ -330,8 +330,8 @@ export default function AssessmentDetail({ patient, assessment, viewMeasurements
                                             )}
                                         </div>
                                         <p className="mt-2 text-muted-foreground">
-                                            The measurements currently available are not sufficient to confirm a posture type.
-                                            No Swayback, Lordosis or Kyphosis diagnosis has been made.
+                                            {classificationInfo.explanation
+                                                || 'The measurements currently available are not sufficient to suggest a posture pattern. Measurement review is required.'}
                                         </p>
                                     </div>
                                 )}

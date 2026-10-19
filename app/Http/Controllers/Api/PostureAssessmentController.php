@@ -44,6 +44,7 @@ class PostureAssessmentController extends Controller
         $request->validate([
             'assessment_date' => 'required|date',
             'health_screening_id' => 'nullable|exists:health_screenings,id',
+            'skill_assessment_id' => 'nullable|exists:skill_assessments,id',
             'measurements' => 'required|array',
             'measurements.*.section' => 'required|string',
             'measurements.*.value' => 'required|numeric',
@@ -62,6 +63,7 @@ class PostureAssessmentController extends Controller
             $assessment = PostureAssessment::create([
                 'patient_id' => $patient->id,
                 'health_screening_id' => $request->health_screening_id,
+                'skill_assessment_id' => $request->skill_assessment_id,
                 'assessment_date' => $request->assessment_date,
                 'time_mark' => $timeMark,
             ]);
@@ -82,6 +84,7 @@ class PostureAssessmentController extends Controller
 
             $decisionResult = $this->decisionEngine->decide($assessment);
             $globalAnalysis = $this->decisionEngine->generateGlobalAnalysis($assessment);
+            $patientProblem = $this->interpretationEngine->patientProblem($assessment);
 
             $aquaticRecs = $this->aquaticEngine->recommend($assessment);
             $massageRecs = $this->massageEngine->recommend($assessment);
@@ -92,6 +95,7 @@ class PostureAssessmentController extends Controller
                 'overall_status' => $overallScore >= 80 ? 'GOOD' : ($overallScore >= 60 ? 'MODERATE' : 'NEEDS IMPROVEMENT'),
                 'clinical_summary' => $clinicalSummary,
                 'primary_findings' => json_encode($primaryFindings),
+                'patient_problem' => $patientProblem,
             ]);
 
             if ($request->has('images')) {
@@ -123,6 +127,7 @@ class PostureAssessmentController extends Controller
                 'assessment' => $assessment,
                 'decision_result' => $decisionResult,
                 'global_analysis' => $globalAnalysis,
+                'patient_problem' => $patientProblem,
                 'measurements' => $interpretations,
                 'symmetry' => $symmetry,
                 'overall_interpretation' => $overallInterpretation,

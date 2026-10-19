@@ -104,22 +104,19 @@
     .c-code { width: 12%; }
     .c-val { width: 14%; text-align: right; }
     .c-corr { width: 22%; }
+    .c-meas { width: 11%; text-align: right; }
+    .c-ref  { width: 13%; text-align: right; }
+    .c-dev  { width: 13%; text-align: right; }
     .val { font-weight: bold; }
 
-    /* ---------- Photo + table split (A./B. pages) ---------- */
-    table.split { width: 100%; border-collapse: collapse; page-break-inside: avoid; }
-    table.split > tbody > tr > td { vertical-align: top; }
-    td.photo { width: 42%; padding-right: 12px; text-align: center; }
-    /* The posture photos are tall, narrow crops, so they are sized by height
-       (dompdf scales the width proportionally) to fill the page. */
-    td.photo img { height: 470pt; border: 1px solid #E4EBEE; }
-
-    /* ---------- Two views side by side (C./D. page) ---------- */
-    table.two-col { width: 100%; border-collapse: collapse; }
-    table.two-col > tbody > tr > td { width: 50%; vertical-align: top; padding-right: 10px; }
-    table.two-col > tbody > tr > td + td { padding-right: 0; padding-left: 10px; }
-    .side-photo { text-align: center; margin-bottom: 8px; }
-    .side-photo img { height: 470pt; border: 1px solid #E4EBEE; }
+    /* ---------- Posture plate (one view per page) ----------
+       The photo sits full width above its measurement table, so the table
+       always has the whole content width and neither element can run past the
+       right margin. The photo is sized by height (dompdf scales the width
+       proportionally) and the overlay box the service computes is capped to
+       the content width, so a plate always fits inside one A4 content box. */
+    .photo-block { text-align: center; margin-bottom: 10px; }
+    .plain-photo { height: 360pt; max-width: 100%; border: 1px solid #E4EBEE; }
 
     /* ---------- Anatomical labels on a posture photo ----------
        A label gutter sits to the left of the photo; the photo, the labels and
@@ -231,6 +228,33 @@
 
     .comment { font-size: 9.5px; font-weight: bold; color: #0A3C50; margin: 10px 0 5px 0; }
 
+    /* ---------- Student progress dashboard ----------
+       Dompdf has no canvas, flexbox or transforms, so every chart below is a
+       stack of fixed-height block elements. The line chart is an SVG document
+       embedded through <img>; an inline <svg> loses its shapes in dompdf. */
+    .skill-chart { margin-bottom: 15px; }
+    .skill-chart-title { font-size: 9px; font-weight: bold; color: #0A3C50; margin: 0 0 3px 0; }
+    .skill-chart-note { font-size: 8px; color: #64748B; margin: 0 0 7px 0; }
+    .skill-line { width: 519pt; height: 190pt; display: block; }
+
+    table.skill-bars { width: 100%; border-collapse: collapse; }
+    table.skill-bars td { width: 25%; vertical-align: bottom; text-align: center; padding: 0 7px; }
+    .skill-bar-track { height: 100pt; background: #F1F5F9; }
+    .skill-bar-fill { background: #0E7C86; }
+    .skill-bar-pct { font-size: 9px; font-weight: bold; color: #0E7C86; margin-top: 5px; }
+    .skill-bar-label { font-size: 7.5px; font-weight: bold; color: #0A3C50; margin-top: 2px; line-height: 1.25; }
+    .skill-bar-count { font-size: 7.5px; color: #64748B; margin-top: 1px; }
+    .skill-bars-rule { border-top: 1px solid #CBD5E1; height: 0; }
+
+    table.skill-score { width: 100%; border-collapse: collapse; background: #F6F9FA; border: 1px solid #E4EBEE; border-left: 3px solid #0E7C86; }
+    table.skill-score td { vertical-align: top; padding: 9px 11px; }
+    .skill-score-value { font-size: 26px; font-weight: bold; line-height: 28px; color: #0A3C50; }
+    .skill-score-meta { font-size: 8px; color: #64748B; margin-top: 2px; }
+    .skill-score-count { font-size: 8.5px; color: #0A3C50; margin-bottom: 6px; }
+    .skill-score-track { height: 9pt; background: #E4EBEE; }
+    .skill-score-fill { height: 9pt; background: #0E7C86; }
+    .skill-score-note { font-size: 8px; color: #64748B; margin-top: 6px; }
+
     .star { color: #CA8A04; }
 
     .footnote {
@@ -277,108 +301,243 @@
     @endforelse
 </div>
 
+{{-- ==================== STUDENT PROGRESS DASHBOARD ==================== --}}
+{{-- One dashboard per patient, not per assessment: the report shows every
+     sitting on record, taken from AquaticSkillsProgressService. --}}
+@if (count($skills['sessions']))
+    <div class="pb"></div>
+
+    <div class="band first">Student Progress Dashboard</div>
+    <p class="muted" style="margin: 0 0 11px 0">
+        Aquatic skills checklist across {{ count($skills['sessions']) }} sitting{{ count($skills['sessions']) === 1 ? '' : 's' }}
+        ({{ $skills['catalogue']['version'] }}, {{ $skills['catalogue']['item_count'] }} items).
+    </p>
+
+    <div class="skill-chart">
+        <div class="skill-chart-title">1. Overall progress</div>
+        <p class="skill-chart-note">Score at each sitting, oldest first.</p>
+        <img class="skill-line" src="{{ $skills['chart']['uri'] }}" alt="Overall skills progress across sittings">
+    </div>
+
+    <div class="skill-chart">
+        <div class="skill-chart-title">2. Progress by Assessment Category</div>
+        <p class="skill-chart-note">Each category as a percentage of its own items: the four categories hold 9, 6, 9 and 11 items, so raw counts would favour the longest.</p>
+        <table class="skill-bars">
+            <tr>
+                @foreach ($skills['categories'] as $category)
+                    @php
+                        $fill = max(1.5, min(100.0, round((float) $category['percentage'], 1)));
+                    @endphp
+                    <td>
+                        <div class="skill-bar-track">
+                            <div style="height: {{ 100 - $fill }}pt"></div>
+                            <div class="skill-bar-fill" style="height: {{ $fill }}pt"></div>
+                        </div>
+                    </td>
+                @endforeach
+            </tr>
+            <tr>
+                @foreach ($skills['categories'] as $category)
+                    <td>
+                        <div class="skill-bar-pct">{{ $category['percentage'] }}%</div>
+                        <div class="skill-bar-label">{{ $category['label'] }}</div>
+                        <div class="skill-bar-count">{{ $category['achieved'] }} / {{ $category['total'] }} items</div>
+                    </td>
+                @endforeach
+            </tr>
+        </table>
+        <div class="skill-bars-rule"></div>
+    </div>
+
+    <div class="skill-chart">
+        <div class="skill-chart-title">3. Overall score as a percentage</div>
+        <table class="skill-score">
+            <tr>
+                <td style="width: 32%">
+                    <div class="skill-score-value">{{ $skills['current']['percentage'] }}%</div>
+                    <div class="skill-score-meta">{{ $skills['current']['label'] }} · {{ $skills['current']['date'] }}</div>
+                </td>
+                <td>
+                    <div class="skill-score-count">
+                        <strong>{{ $skills['current']['achieved'] }}</strong> of {{ $skills['current']['max'] }} items achieved
+                        · {{ $skills['current']['missed'] }} not achieved
+                    </div>
+                    <div class="skill-score-track">
+                        <div class="skill-score-fill" style="width: {{ $skills['current']['percentage'] }}%"></div>
+                    </div>
+                    <div class="skill-score-note">
+                        @if ($skills['improvement']['has_comparison'])
+                            @php
+                                $itemDelta = (int) $skills['improvement']['items'];
+                                $pointDelta = (float) $skills['improvement']['percentage_points'];
+                                $baselineLabel = $skills['improvement']['baseline']['label'] ?? 'the baseline';
+                            @endphp
+                            @if ($itemDelta === 0 && $pointDelta === 0.0)
+                                No change since {{ $baselineLabel }}.
+                            @else
+                                {{ $itemDelta > 0 ? '+' : '' }}{{ $itemDelta }} items ·
+                                {{ $pointDelta > 0 ? '+' : '' }}{{ $pointDelta }} percentage points since {{ $baselineLabel }}.
+                            @endif
+                        @else
+                            First sitting recorded — a comparison appears after the next sitting.
+                        @endif
+                    </div>
+                </td>
+            </tr>
+        </table>
+    </div>
+@endif
+
 {{-- ==================== A. FRONT / B. BACK ==================== --}}
+{{-- Each view gets its own page. The labelled photo sits full width at the top
+     and its measurement table spans the whole content width underneath, so
+     neither the overlay box nor the table can run past the right margin. --}}
+<div class="pb"></div>
 @foreach (['front', 'back'] as $key)
     <div class="view-head first"><span class="ltr">{{ $views[$key]['letter'] }}.</span> {{ $views[$key]['name'] }}</div>
-    <table class="split">
-        <tr>
-            @isset ($images[$key])
-                <td class="photo">
-                    @if (empty($images[$key]['levels']))
-                        <img src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-                    @else
-                        <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
-                            <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-                            @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => true])
-                            @foreach ($images[$key]['levels'] as $level)
-                                <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
-                                <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
-                                <div class="cm-dot" style="left: {{ $level['dot_left'] }}pt; top: {{ $level['dot_top'] }}pt"></div>
-                            @endforeach
-                        </div>
-                    @endif
-                </td>
-            @endisset
-            <td>
-                <table class="data">
-                    <thead>
-                        <tr>
-                            <th class="c-code">Label</th>
-                            <th class="c-sec">Section</th>
-                            <th class="c-val">Value</th>
-                            <th class="c-corr">Correction Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($views[$key]['rows'] as $row)
-                            <tr>
-                                <td>{{ $row['code'] }}</td>
-                                <td>{{ $row['name'] }}</td>
-                                <td class="val" style="color: {{ $row['color'] }}">{{ $row['value'] }}°</td>
-                                <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="4" class="muted">No measurements captured for this view.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </td>
-        </tr>
+    @isset ($images[$key])
+        <div class="photo-block">
+            @if (empty($images[$key]['levels']))
+                <img class="plain-photo" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
+            @else
+                <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
+                    <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
+                    @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => true])
+                    @foreach ($images[$key]['levels'] as $level)
+                        <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
+                        <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
+                        <div class="cm-dot" style="left: {{ $level['dot_left'] }}pt; top: {{ $level['dot_top'] }}pt"></div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    @endisset
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c-code">Marker</th>
+                <th class="c-sec">Parameter</th>
+                <th class="c-meas">Measured</th>
+                <th class="c-ref">Reference</th>
+                <th class="c-dev">Deviation</th>
+                <th class="c-corr">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($views[$key]['rows'] as $row)
+                <tr>
+                    <td>{{ $row['code'] !== '' ? $row['code'] : '—' }}</td>
+                    <td>{{ $row['name'] }}</td>
+                    <td class="c-meas">{{ $row['measured'] }}°</td>
+                    <td class="c-ref">{{ $row['reference'] !== null ? $row['reference'].'°' : 'Baseline' }}@if ($row['tolerance'] !== null) <span class="muted">±{{ $row['tolerance'] }}°</span>@endif</td>
+                    <td class="c-dev val" style="color: {{ $row['color'] }}">{{ $row['deviation'] !== null ? $row['deviation'].'°' : '—' }}</td>
+                    <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="6" class="muted">No measurements captured for this view.</td></tr>
+            @endforelse
+        </tbody>
     </table>
     <div class="pb"></div>
 @endforeach
 
 {{-- ==================== C. RIGHT SIDE / D. LEFT SIDE ==================== --}}
-<table class="two-col">
-    <tr>
-        @foreach (['right_side', 'left_side'] as $key)
-            <td>
-                <div class="view-head first"><span class="ltr">{{ $views[$key]['letter'] }}.</span> {{ $views[$key]['name'] }}</div>
-                @isset ($images[$key])
-                    <div class="side-photo">
-                        @if (empty($images[$key]['levels']))
-                            <img src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-                        @else
-                            <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
-                                <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-                                @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => false])
-                                @foreach ($images[$key]['levels'] as $level)
-                                    <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
-                                    <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
-                                    <div class="cm-dot" style="left: {{ $level['dot_left'] }}pt; top: {{ $level['dot_top'] }}pt"></div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                @endisset
-                <table class="data">
-                    <thead>
-                        <tr>
-                            <th class="c-code">Label</th>
-                            <th class="c-sec">Section</th>
-                            <th class="c-val">Value</th>
-                            <th class="c-corr">Correction Status</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse ($views[$key]['rows'] as $row)
-                            <tr>
-                                <td>{{ $row['code'] }}</td>
-                                <td>{{ $row['name'] }}</td>
-                                <td class="val" style="color: {{ $row['color'] }}">{{ $row['value'] }}°</td>
-                                <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
-                            </tr>
-                        @empty
-                            <tr><td colspan="4" class="muted">No measurements.</td></tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </td>
-        @endforeach
-    </tr>
-</table>
+{{-- Same stacked plate as the front/back views: one side per page, photo on
+     top, measurement table full width underneath. --}}
+@foreach (['right_side', 'left_side'] as $key)
+    <div class="view-head first"><span class="ltr">{{ $views[$key]['letter'] }}.</span> {{ $views[$key]['name'] }}</div>
+    @isset ($images[$key])
+        <div class="photo-block">
+            @if (empty($images[$key]['levels']))
+                <img class="plain-photo" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
+            @else
+                <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
+                    <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
+                    @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => false])
+                    @foreach ($images[$key]['levels'] as $level)
+                        <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
+                        <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
+                        <div class="cm-dot" style="left: {{ $level['dot_left'] }}pt; top: {{ $level['dot_top'] }}pt"></div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+    @endisset
+    <table class="data">
+        <thead>
+            <tr>
+                <th class="c-code">Marker</th>
+                <th class="c-sec">Parameter</th>
+                <th class="c-dev">Deviation</th>
+                <th class="c-corr">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            @forelse ($views[$key]['rows'] as $row)
+                <tr>
+                    <td>{{ $row['code'] !== '' ? $row['code'] : '—' }}</td>
+                    <td>{{ $row['name'] }}</td>
+                    <td class="c-dev val" style="color: {{ $row['color'] }}">{{ $row['deviation'] !== null ? $row['deviation'].'°' : '—' }}</td>
+                    <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
+                </tr>
+            @empty
+                <tr><td colspan="4" class="muted">No measurements.</td></tr>
+            @endforelse
+        </tbody>
+    </table>
+    <div class="pb"></div>
+@endforeach
 
-<div class="pb"></div>
+{{-- ============ DETAILED ANGLE BREAKDOWN (admin panel only) ============ --}}
+{{-- Requested only by the web admin (SpariskReportPdfService::download(…, true)).
+     The mobile app never sets $extended, so its document is unchanged. --}}
+@if ($extended)
+    <div class="band first">Detailed Angle Breakdown</div>
+    <p class="muted" style="margin: 0 0 6px 0">
+        Full per-view measurement detail. Every marker lists the measured anatomical
+        angle, the SATA reference applied (with its reference level), the resulting
+        deviation angle and the clinical note.
+    </p>
+
+    @foreach ($views as $key => $view)
+        @if (count($view['rows']))
+            <div class="view-head {{ $loop->first ? 'first' : '' }}"><span class="ltr">{{ $view['letter'] }}.</span> {{ $view['name'] }} — Angle Breakdown</div>
+            <table class="data">
+                <thead>
+                    <tr>
+                        <th class="c-code">Marker</th>
+                        <th class="c-sec">Parameter</th>
+                        <th class="c-meas">Measured</th>
+                        <th class="c-ref">Reference</th>
+                        <th class="c-dev">Deviation</th>
+                        <th>Ref. Level</th>
+                        <th class="c-sec">Status</th>
+                        <th>Note</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($view['rows'] as $row)
+                        <tr>
+                            <td>{{ $row['code'] !== '' ? $row['code'] : '—' }}</td>
+                            <td>{{ $row['name'] }}</td>
+                            <td class="c-meas">{{ $row['measured'] }}°</td>
+                            <td class="c-ref">{{ $row['reference'] !== null ? $row['reference'].'°' : 'Baseline' }}@if ($row['tolerance'] !== null) <span class="muted">±{{ $row['tolerance'] }}°</span>@endif</td>
+                            <td class="c-dev val" style="color: {{ $row['color'] }}">{{ $row['deviation'] !== null ? $row['deviation'].'°' : '—' }}</td>
+                            <td>{{ $row['reference_level'] ?: ($row['is_baseline'] ? 'Individual Baseline' : '-') }}</td>
+                            <td style="color: {{ $row['color'] }}">{{ $row['status'] }}</td>
+                            <td class="muted">{{ $row['note'] ?: '-' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+            @if (! $loop->last)
+                <div class="pb"></div>
+            @endif
+        @endif
+    @endforeach
+
+    <div class="pb"></div>
+@endif
 
 {{-- ==================== SCORE-CARD GRID PAGES ==================== --}}
 {{-- Hidden for now — kept for later. Remove this comment pair to show the
@@ -413,8 +572,7 @@
 <div class="band first">Posture Classification</div>
 @if ($classification['review_required'])
     <p class="muted" style="margin: 0 0 6px 0">
-        The measurements currently available are not sufficient to confirm a posture type.
-        No posture diagnosis has been made.
+        {{ $classification['explanation'] ?: 'The measurements currently available are not sufficient to suggest a posture pattern. Measurement review is required.' }}
     </p>
 @endif
 <table class="fields">

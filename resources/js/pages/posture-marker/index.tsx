@@ -27,6 +27,7 @@ interface Marker {
     severity: string;
     type: string;
     color: string | null;
+    status_label: string;
     label: string | null;
     muscle: string | null;
     x: number;
@@ -39,6 +40,21 @@ interface Marker {
 }
 
 type MarkerDraft = Partial<Marker>;
+
+/**
+ * The one label a marker prints. `status_label` comes from the backend so the
+ * admin list, the app body view and the marker detail sheet all read the same
+ * word; the fallback keeps older payloads readable.
+ */
+const statusLabelOf = (m: { status_label?: string | null; severity?: string | null; type?: string | null }) => {
+    const label = (m.status_label ?? '').trim();
+    if (label) return label;
+
+    const severity = (m.severity ?? '').trim().toLowerCase();
+    if (severity === 'moderate') return (m.type ?? '').trim().toLowerCase() === 'weak' ? 'Weak' : 'Tight';
+    if (severity === 'severe') return 'Severe';
+    return 'Normal';
+};
 
 const TYPE_DEFAULT_COLOR: Record<string, string> = {
     tight: '#fde047', // light yellow
@@ -223,9 +239,12 @@ export default function Index({
                 <div className="mb-4">
                     <h1 className="text-2xl font-semibold">Posture Markers</h1>
                     <p className="text-sm text-muted-foreground">
-                        Place the red (tight) and green (weak) markers on the character images. Click the
-                        image to add a marker, drag a marker to move it. The mobile app uses these to point
-                        at the patient&apos;s problem areas.
+                        Arrange the muscle markers on the character images. Click the image to add a marker,
+                        drag a marker to move it. The mobile app draws them on the patient&apos;s photo and
+                        colours each muscle from its own findings, so one photo can mix bands.
+                    </p>
+                    <p className="mt-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                        Yellow / green = normal · Orange = moderate · Red = severe
                     </p>
                 </div>
 
@@ -401,8 +420,8 @@ export default function Index({
                                                     <span className="truncate text-sm font-medium">
                                                         {m.label || m.muscle || 'Marker'}
                                                     </span>
-                                                    <Badge variant="outline" className="text-[10px] capitalize">
-                                                        {m.type}
+                                                    <Badge variant="outline" className="text-[10px]">
+                                                        {statusLabelOf(m)}
                                                     </Badge>
                                                     <Badge variant="secondary" className="text-[10px]">
                                                         {m.gender}

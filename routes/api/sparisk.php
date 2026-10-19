@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\PostureMarkerController;
 use App\Http\Controllers\Api\PostureSettingController;
 use App\Http\Controllers\Api\ProgressController;
 use App\Http\Controllers\Api\ReportController;
+use App\Http\Controllers\Api\SkillAssessmentController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -32,6 +33,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('patients/{patient}/health-screenings', [HealthScreeningController::class, 'index']);
     Route::post('patients/{patient}/health-screenings', [HealthScreeningController::class, 'store']);
     Route::get('health-screenings/{healthScreening}', [HealthScreeningController::class, 'show']);
+
+    // SATA Aquatic Skills Assessment checklist and Student Progress Dashboard
+    Route::get('skill-assessment/catalogue', [SkillAssessmentController::class, 'catalogue']);
+    Route::get('patients/{patient}/skill-assessments', [SkillAssessmentController::class, 'index']);
+    Route::post('patients/{patient}/skill-assessments', [SkillAssessmentController::class, 'store']);
 
     // Posture Assessments - Full Pipeline
     Route::post('patients/{patient}/assessments', [PostureAssessmentController::class, 'store']);

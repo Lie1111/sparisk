@@ -6,76 +6,107 @@ use App\Models\PostureSetting;
 use Illuminate\Database\Seeder;
 
 /**
- * Seeds the SATA Age-Based Posture Reference v1.1.
+ * Seeds the SATA Posture Reference Table v1 — Evidence Based.
  *
- * Values are the fixed SATA reference angles (degrees) per camera view and
- * age group. Deviation = ABS(Clinical Angle - Age Reference) is compared
- * against the locked SATA severity bands (see config/sparisk.php).
+ * DEVIATION ANGLE OUTPUT: every row stores the reference the engine will
+ * subtract from the measured angle, together with its provenance:
+ *   - reference_value : the applicable reference (NULL for an evidence gap)
+ *   - normal_min/max  : the published reference band, used as the tolerance
+ *                       for On Point / Near Point / Off Point
+ *   - reference_level : published | sata_validated | individual_baseline
+ *   - reference_source: where the value came from, so the deviation is traceable
+ *   - sex             : the sex the reference applies to, when the evidence
+ *                       requires it (Pelvic Tilt, Knee)
+ *
+ * NO arbitrary cut-off is invented: a parameter with no Level 1 / Level 2
+ * reference is stored as individual_baseline with a NULL reference value.
  */
 class PostureSettingSeeder extends Seeder
 {
     private const AGE_GROUPS = ['6-8', '9-12', '13-18', '19-49', '50+'];
 
+    /**
+     * Frontal/back definitional neutrals. These are SATA-validated references
+     * (a level line is 0°). The tolerance for the point bands comes from the
+     * locked SATA severity thresholds for the region.
+     *
+     * [view, section, label, [6-8, 9-12, 13-18, 19-49, 50+], interpretation]
+     */
+    private const FRONT = [
+        ['A1',  'Body Alignment',          [0, 0, 0, 0, 0], 'Vertical neutral'],
+        ['A2',  'Head Tilt',               [0, 0, 0, 0, 0], 'Horizontal neutral'],
+        ['A3',  'Shoulder Alignment',      [0, 0, 0, 0, 0], 'Level shoulders'],
+        ['A4',  'Axillae Alignment',       [0, 0, 0, 0, 0], 'Symmetrical'],
+        ['A5',  'Ribcage Tilt',            [0, 0, 0, 0, 0], 'Level rib cage'],
+        ['A6',  'Trunk Alignment',         [0, 0, 0, 0, 0], 'Midline'],
+        ['A7',  'Pelvic Tilt / Obliquity', [0, 0, 0, 0, 0], 'Level pelvis'],
+        ['A8',  'Right Knee Angle',        [0, 0, 0, 0, 0], 'Neutral frontal alignment'],
+        ['A9',  'Left Knee Angle',         [0, 0, 0, 0, 0], 'Neutral frontal alignment'],
+        ['A10', 'Right Foot Rotation',     [5, 7, 7, 7, 8], 'External foot progression'],
+        ['A11', 'Left Foot Rotation',      [5, 7, 7, 7, 8], 'External foot progression'],
+    ];
+
+    private const BACK = [
+        ['B1', 'Body Alignment',          [0, 0, 0, 0, 0], 'Vertical neutral'],
+        ['B2', 'Head Tilt',               [0, 0, 0, 0, 0], 'Head level'],
+        ['B3', 'Shoulder Alignment',      [0, 0, 0, 0, 0], 'Shoulders level'],
+        ['B4', 'Axillae Alignment',       [0, 0, 0, 0, 0], 'Symmetrical'],
+        ['B5', 'Trunk Alignment',         [0, 0, 0, 0, 0], 'Midline'],
+        ['B6', 'Pelvic Tilt / Obliquity', [0, 0, 0, 0, 0], 'Pelvis level'],
+        ['B7', 'Knee Alignment',          [0, 0, 0, 0, 0], 'Neutral'],
+        ['B8', 'Feet Alignment',          [0, 0, 0, 0, 0], 'Neutral rear-foot alignment'],
+    ];
+
+    /**
+     * Region tolerance for the SATA-validated definitional neutrals, taken
+     * from the locked severity thresholds (mild band). Used as the ± tolerance
+     * around the reference for the point bands.
+     */
+    private const NEUTRAL_REGION = [
+        'A1' => 'trunk', 'A2' => 'head', 'A3' => 'shoulder', 'A4' => 'trunk',
+        'A5' => 'trunk', 'A6' => 'trunk', 'A7' => 'pelvic', 'A8' => 'knee',
+        'A9' => 'knee', 'A10' => 'foot', 'A11' => 'foot',
+        'B1' => 'trunk', 'B2' => 'head', 'B3' => 'shoulder', 'B4' => 'trunk',
+        'B5' => 'trunk', 'B6' => 'pelvic', 'B7' => 'knee', 'B8' => 'foot',
+    ];
+
     public function run(): void
     {
-        // [view, section, label, [6-8, 9-12, 13-18, 19-49, 50+], interpretation]
-        $front = [
-            ['A1',  'Body Alignment',          [0, 0, 0, 0, 0], 'Vertical neutral'],
-            ['A2',  'Head Tilt',               [0, 0, 0, 0, 0], 'Horizontal neutral'],
-            ['A3',  'Shoulder Alignment',      [0, 0, 0, 0, 0], 'Level shoulders'],
-            ['A4',  'Axillae Alignment',       [0, 0, 0, 0, 0], 'Symmetrical'],
-            ['A5',  'Ribcage Tilt',            [0, 0, 0, 0, 0], 'Level rib cage'],
-            ['A6',  'Trunk Alignment',         [0, 0, 0, 0, 0], 'Midline'],
-            ['A7',  'Pelvic Tilt / Obliquity', [0, 0, 0, 0, 0], 'Level pelvis'],
-            ['A8',  'Right Knee Angle',        [0, 0, 0, 0, 0], 'Neutral frontal alignment'],
-            ['A9',  'Left Knee Angle',         [0, 0, 0, 0, 0], 'Neutral frontal alignment'],
-            ['A10', 'Right Foot Rotation',     [5, 7, 7, 7, 8], 'External foot progression'],
-            ['A11', 'Left Foot Rotation',      [5, 7, 7, 7, 8], 'External foot progression'],
-        ];
+        // Legacy rows were written with an empty-string sex ('') instead of
+        // NULL. Only NULL is neutral for the engine, so those rows are dead
+        // duplicates that shadow the real reference. Drop them first and let
+        // the seeders below rebuild every parameter with sex = NULL.
+        PostureSetting::where('sex', '')->delete();
 
-        $back = [
-            ['B1', 'Body Alignment',          [0, 0, 0, 0, 0], 'Vertical neutral'],
-            ['B2', 'Head Tilt',               [0, 0, 0, 0, 0], 'Head level'],
-            ['B3', 'Shoulder Alignment',      [0, 0, 0, 0, 0], 'Shoulders level'],
-            ['B4', 'Axillae Alignment',       [0, 0, 0, 0, 0], 'Symmetrical'],
-            ['B5', 'Trunk Alignment',         [0, 0, 0, 0, 0], 'Midline'],
-            ['B6', 'Pelvic Tilt / Obliquity', [0, 0, 0, 0, 0], 'Pelvis level'],
-            ['B7', 'Knee Alignment',          [0, 0, 0, 0, 0], 'Neutral'],
-            ['B8', 'Feet Alignment',          [0, 0, 0, 0, 0], 'Neutral rear-foot alignment'],
-        ];
+        $this->seedNeutralReferences();
+        $this->seedReferenceTable();
+        $this->seedEvidenceGaps();
+    }
 
-        $side = [
-            ['C1',              'Body Alignment',      [0, 0, 0, 0, 0], '+/- deviation = anterior/posterior body lean'],
-            ['side_cva',        'CVA / Head Reference', [55, 53, 50, 50, 48], 'Downward CVA = increased Forward Head Posture'],
-            ['C2',              'Head Shift',          [0, 0, 0, 0, 0], 'Anterior displacement up = forward head shift'],
-            ['C3',              'Shoulder Angle',      [0, 0, 0, 0, 0], 'Anterior deviation up = shoulder protraction/rounded shoulder'],
-            ['side_kyphosis',   'Thoracic Kyphosis',   [40, 44, 45, 40, 46], 'Up = increased thoracic kyphosis; Down = reduced thoracic curvature'],
-            ['C4',              'Pelvic Tilt (APT)',   [7, 8, 9, 10, 10], 'Up = increased anterior pelvic tilt; Down = posterior tilt tendency'],
-            ['side_lordosis',   'Lumbar Lordosis',     [54, 55, 55, 45, 40], 'Up = increased lordosis; Down = reduced/flattened lordosis'],
-            ['C5',              'Knee',                [0, 0, 0, 0, 0], 'Flexion = flexed-knee; extension beyond neutral = hyperextension'],
-            ['C6',              'Tibia Alignment',     [0, 0, 0, 0, 0], 'Deviation = altered anterior/posterior lower-leg alignment'],
-            ['C7',              'Foot/Ankle Angle',    [0, 0, 0, 0, 0], 'Deviation = altered sagittal foot/ankle alignment'],
-        ];
-
-        // Right and left sagittal reference values are identical.
-        $rightSide = $this->mapSideSections($side, 'C');
-        $leftSide = $this->mapSideSections($side, 'D');
-
-        $rows = [
-            ['front', $front],
-            ['back', $back],
-            ['right_side', $rightSide],
-            ['left_side', $leftSide],
-        ];
-
-        foreach ($rows as [$view, $params]) {
+    /**
+     * Frontal and back definitional neutrals (SATA validated, reference 0° or
+     * the foot-progression neutral).
+     */
+    private function seedNeutralReferences(): void
+    {
+        foreach ([['front', self::FRONT], ['back', self::BACK]] as [$view, $params]) {
             foreach ($params as [$section, $label, $references, $interpretation]) {
+                $region = self::NEUTRAL_REGION[$section] ?? 'trunk';
+                $tolerance = (float) config("sparisk.severity_thresholds.{$region}.mild", 5);
+
                 foreach (self::AGE_GROUPS as $i => $ageGroup) {
+                    $value = (float) $references[$i];
+
                     PostureSetting::updateOrCreate(
-                        ['view' => $view, 'section' => $section, 'age_group' => $ageGroup],
+                        ['view' => $view, 'section' => $section, 'age_group' => $ageGroup, 'sex' => null],
                         [
                             'label' => $label,
-                            'reference_value' => $references[$i],
+                            'reference_value' => $value,
+                            'normal_min' => round($value - $tolerance, 2),
+                            'normal_max' => round($value + $tolerance, 2),
+                            'reference_source' => 'SATA validated — definitional neutral alignment',
+                            'reference_level' => 'sata_validated',
+                            'sex_if_required' => false,
                             'interpretation' => $interpretation,
                         ]
                     );
@@ -85,17 +116,101 @@ class PostureSettingSeeder extends Seeder
     }
 
     /**
-     * Prefix measured side sections with the given view letter (C/D) while
-     * leaving clinical-only keys (side_*) untouched.
+     * The locked sagittal reference table for D1–D7. One parameter expands to
+     * its measurement sections, its age groups and (only where the evidence
+     * requires it) its male/female variants.
      */
-    private function mapSideSections(array $rows, string $letter): array
+    private function seedReferenceTable(): void
     {
-        return array_map(function ($row) use ($letter) {
-            $section = str_starts_with($row[0], 'side_')
-                ? $row[0]
-                : $letter . substr($row[0], 1);
+        $table = config('sparisk.posture_reference_table', []);
 
-            return [$section, $row[1], $row[2], $row[3]];
-        }, $rows);
+        foreach ($table as $parameter) {
+            $sexRequired = (bool) ($parameter['sex_if_required'] ?? false);
+
+            foreach (self::AGE_GROUPS as $ageGroup) {
+                $group = $parameter['groups'][$ageGroup] ?? null;
+                if ($group === null) {
+                    continue;
+                }
+
+                // Either a single reference or sex-keyed variants. A PHP array
+                // cannot hold a NULL key (it collapses to ""), so the single
+                // case is handled explicitly to keep `sex` NULL for neutral rows.
+                $isSingle = isset($group['level']);
+                $sexes = $isSingle ? [null] : array_keys($group);
+
+                foreach ($sexes as $sex) {
+                    $body = $isSingle ? $group : $group[$sex];
+
+                    foreach ($parameter['sections'] as $section) {
+                        PostureSetting::updateOrCreate(
+                            [
+                                'view' => $section['view'],
+                                'section' => $section['section'],
+                                'age_group' => $ageGroup,
+                                'sex' => $sex,
+                            ],
+                            [
+                                'label' => $parameter['label'],
+                                'reference_value' => $body['value'] ?? null,
+                                'normal_min' => $body['min'] ?? null,
+                                'normal_max' => $body['max'] ?? null,
+                                'reference_source' => $body['source'] ?? 'SATA Evidence Gap — Individual Baseline',
+                                'reference_level' => $body['level'],
+                                'sex_if_required' => $sexRequired,
+                                'interpretation' => $this->interpretationFor($body['level']),
+                            ]
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Any measurement section the locked table does not carry is an evidence
+     * gap: it is stored as individual_baseline with a NULL reference value so
+     * the engine reports change from the individual's own first assessment and
+     * never invents a population cut-off.
+     */
+    private function seedEvidenceGaps(): void
+    {
+        $measurements = config('sparisk.measurements', []);
+
+        foreach ($measurements as $section => $def) {
+            foreach (self::AGE_GROUPS as $ageGroup) {
+                $exists = PostureSetting::where('view', $def['view'])
+                    ->where('section', $section)
+                    ->where('age_group', $ageGroup)
+                    ->exists();
+
+                if ($exists) {
+                    continue;
+                }
+
+                PostureSetting::updateOrCreate(
+                    ['view' => $def['view'], 'section' => $section, 'age_group' => $ageGroup, 'sex' => null],
+                    [
+                        'label' => $def['label'],
+                        'reference_value' => null,
+                        'normal_min' => null,
+                        'normal_max' => null,
+                        'reference_source' => 'SATA Evidence Gap — Individual Baseline',
+                        'reference_level' => 'individual_baseline',
+                        'sex_if_required' => false,
+                        'interpretation' => $this->interpretationFor('individual_baseline'),
+                    ]
+                );
+            }
+        }
+    }
+
+    private function interpretationFor(string $level): string
+    {
+        return match ($level) {
+            'published' => 'Compared against the applicable published reference for the age group.',
+            'sata_validated' => 'Compared against the SATA-validated reference.',
+            default => 'No population reference yet — tracked as change from the individual baseline.',
+        };
     }
 }

@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FormDialog } from '@/components/form-dialog';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { PatientForm, usePatientForm } from './partials';
+import { PatientForm, usePatientForm, SkillsProgressDashboard, type SkillsProgress } from './partials';
 
 type BmiResult = {
     valid: boolean;
@@ -49,10 +49,12 @@ type PatientDetail = {
 
 export default function Show({
     patient,
+    skillsProgress,
     neuroProfiles = [],
     neuroConditions = [],
 }: {
     patient: PatientDetail;
+    skillsProgress: SkillsProgress;
     neuroProfiles?: { value: string; label: string }[];
     neuroConditions?: { value: string; label: string }[];
 }) {
@@ -198,6 +200,8 @@ export default function Show({
                         </div>
                     </CardContent>
                 </Card>
+
+                <SkillsProgressDashboard progress={skillsProgress} />
 
                 <Card className="mt-4">
                     <CardHeader>

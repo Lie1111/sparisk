@@ -19,34 +19,6 @@ const viewLabels: Record<string, string> = {
     right_side: 'Right Side (C)', left_side: 'Left Side (D)',
 }
 
-// User-facing alignment wording. The backend sends `alignment_label`, but the
-// map keeps stored measurements (which only carry the band) rendering the same
-// wording as interpreted ones.
-const alignmentLabels: Record<string, string> = {
-    normal: 'Aligned',
-    mild: 'Slightly Misaligned',
-    moderate: 'Misaligned',
-    severe: 'Clearly Misaligned',
-    review: 'Check Measurement',
-}
-
-const alignmentStyles: Record<string, string> = {
-    normal: 'text-green-600 bg-green-50',
-    mild: 'text-yellow-600 bg-yellow-50',
-    moderate: 'text-orange-600 bg-orange-50',
-    severe: 'text-red-600 bg-red-50',
-    review: 'text-slate-500 bg-slate-100',
-}
-
-const alignmentStatusOf = (m: any) => {
-    if (m?.review_required) return 'review'
-    const status = (m?.alignment_status || m?.severity || 'normal').toLowerCase()
-    return alignmentLabels[status] ? status : 'normal'
-}
-
-const alignmentLabelOf = (m: any) =>
-    m?.alignment_label || alignmentLabels[alignmentStatusOf(m)] || 'Aligned'
-
 const humanize = (value?: string) =>
     (value || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
@@ -57,6 +29,51 @@ const fmtAngle = (v: any) => {
     if (v == null || v === '') return '—'
     const n = typeof v === 'number' ? v : parseFloat(v)
     return isNaN(n) ? String(v) : n.toFixed(1)
+}
+
+// SATA user-facing output is DEVIATION ANGLE ONLY. The backend resolves the
+// output status once, so the UI never rebuilds a cut-off of its own.
+const outputStatusLabels: Record<string, string> = {
+    on_point: 'On Point',
+    near_point: 'Near Point',
+    off_point: 'Off Point',
+    baseline_tracking: 'Baseline / Change Tracking',
+    review: 'Check Measurement',
+}
+
+const outputStatusStyles: Record<string, string> = {
+    on_point: 'text-green-600 bg-green-50',
+    near_point: 'text-yellow-600 bg-yellow-50',
+    off_point: 'text-orange-600 bg-orange-50',
+    baseline_tracking: 'text-blue-600 bg-blue-50',
+    review: 'text-slate-500 bg-slate-100',
+}
+
+const levelFallbackStatus: Record<string, string> = {
+    normal: 'on_point',
+    mild: 'near_point',
+    moderate: 'off_point',
+    severe: 'off_point',
+    baseline: 'baseline_tracking',
+    review: 'review',
+}
+
+const outputStatusOf = (m: any) => {
+    if (m?.review_required) return 'review'
+    const code = String(m?.status_code || '').toLowerCase()
+    if (outputStatusLabels[code]) return code
+    const level = String(m?.alignment_status || m?.severity || 'normal').toLowerCase()
+    return levelFallbackStatus[level] || 'review'
+}
+
+// A signed deviation angle: `0` at the reference, `+` above it, `-` below it.
+const fmtDeviation = (v: any) => {
+    if (v == null || v === '') return null
+    const n = typeof v === 'number' ? v : parseFloat(v)
+    if (isNaN(n)) return null
+    const mag = Math.abs(n)
+    const sign = mag < 0.05 ? '' : n > 0 ? '+' : '-'
+    return `${sign}${mag.toFixed(1)}°`
 }
 
 export default function AssessmentShow({ assessment, viewMeasurements, classification }: any) {
@@ -177,8 +194,15 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                             <p className="text-sm text-muted-foreground">No measurements</p>
                                         ) : (
                                             (measurements || []).map((m: any) => {
-                                                const status = alignmentStatusOf(m)
-                                                const note = m.position_note || (status === 'review' ? m.interpretation : '')
+                                                const status = outputStatusOf(m)
+                                                const deviation = fmtDeviation(m.deviation_angle)
+                                                const reference = m.reference_value != null
+                                                    ? `${fmtAngle(m.reference_value)}°`
+                                                    : (status === 'baseline_tracking' ? 'Baseline' : null)
+                                                // The published half-width the point status is
+                                                // judged on, so the On Point call is checkable.
+                                                const tolerance = m.tolerance != null ? `±${fmtAngle(m.tolerance)}° band` : null
+                                                const note = m.position_note || m.interpretation || ''
                                                 return (
                                                     <div key={m.id} className="border-b pb-1">
                                                         <div className="flex items-center justify-between">
@@ -187,13 +211,18 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                                                 <span className="text-sm">{m.label}</span>
                                                             </div>
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium">{fmtAngle(m.value)}°</span>
-                                                                {status !== 'normal' && (
-                                                                    <Badge className={`text-[10px] px-1.5 ${alignmentStyles[status]}`}>
-                                                                        {alignmentLabelOf(m)}
-                                                                    </Badge>
-                                                                )}
+                                                                <span className={`text-sm font-semibold ${outputStatusStyles[status].split(' ')[0]}`}>
+                                                                    {deviation ?? '—'}
+                                                                </span>
+                                                                <Badge className={`text-[10px] px-1.5 ${outputStatusStyles[status]}`}>
+                                                                    {outputStatusLabels[status]}
+                                                                </Badge>
                                                             </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 pl-9 text-xs text-muted-foreground">
+                                                            <span>Measured {fmtAngle(m.measured_angle ?? m.value)}°</span>
+                                                            {reference && <span>Reference {reference}</span>}
+                                                            {tolerance && <span>{tolerance}</span>}
                                                         </div>
                                                         {note && (
                                                             <p className="pl-9 text-xs text-muted-foreground">{note}</p>
@@ -209,6 +238,40 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                     </TabsContent>
 
                     <TabsContent value="classification" className="mt-4 space-y-4">
+                        {assessment.patient_problem?.summary && (
+                            <Card className="border-primary/30 bg-primary/5">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Info className="h-4 w-4" />
+                                        Patient Problem
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    <p className="text-sm leading-relaxed">{assessment.patient_problem.summary}</p>
+                                    {(assessment.patient_problem.problems || []).length > 0 && (
+                                        <ul className="space-y-2">
+                                            {(assessment.patient_problem.problems || []).map((p: any, i: number) => (
+                                                <li key={`${p.section}-${i}`} className="flex items-start justify-between gap-3 border-b pb-2 last:border-0 last:pb-0">
+                                                    <div>
+                                                        <p className="text-sm font-medium">{p.area}</p>
+                                                        <p className="text-xs text-muted-foreground">{p.finding}</p>
+                                                    </div>
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        {p.deviation_angle != null && (
+                                                            <span className="text-sm font-semibold">{fmtDeviation(p.deviation_angle)}</span>
+                                                        )}
+                                                        <Badge className={`text-[10px] ${outputStatusStyles[outputStatusOf(p)]}`}>
+                                                            {p.severity_label}
+                                                        </Badge>
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {isUnclassified && (
                             <Card className="border-orange-200 bg-orange-50/50">
                                 <CardHeader>
@@ -255,8 +318,8 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                         )}
                                     </div>
                                     <p className="text-muted-foreground">
-                                        The measurements currently available are not sufficient to confirm a posture type.
-                                        No Swayback, Lordosis or Kyphosis diagnosis has been made.
+                                        {classificationInfo.explanation
+                                            || 'The measurements currently available are not sufficient to suggest a posture pattern. Measurement review is required.'}
                                     </p>
                                 </CardContent>
                             </Card>
@@ -279,8 +342,8 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                         </div>
                                         <div className="text-right">
                                             {(c.alignment_status || c.severity) && (
-                                                <Badge className={alignmentStyles[alignmentStatusOf(c)]}>
-                                                    {alignmentLabelOf(c)}
+                                                <Badge className={outputStatusStyles[outputStatusOf(c)]}>
+                                                    {outputStatusLabels[outputStatusOf(c)]}
                                                 </Badge>
                                             )}
                                             {c.confidence && (

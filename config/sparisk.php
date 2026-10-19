@@ -152,6 +152,7 @@ return [
         'mild'     => ['label' => 'Slightly Misaligned',  'color' => 'yellow', 'correction' => 'MINOR CORRECTION'],
         'moderate' => ['label' => 'Misaligned',           'color' => 'orange', 'correction' => 'CORRECTION NEEDED'],
         'severe'   => ['label' => 'Clearly Misaligned',   'color' => 'red',    'correction' => 'PRIORITY CORRECTION'],
+        'baseline' => ['label' => 'Baseline / Change Tracking', 'color' => 'blue', 'correction' => 'BASELINE TRACKING'],
         'review'   => ['label' => 'Check Measurement',    'color' => 'grey',   'correction' => 'REVIEW'],
     ],
 
@@ -167,6 +168,347 @@ return [
         'normal'   => 'The position is within the target range.',
         'review'   => 'This measurement may need to be reviewed — the landmark or angle could not be validated.',
         'missing'  => 'This measurement was not captured and needs to be reviewed.',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SATA Reference Levels (Evidence Hierarchy)
+    |--------------------------------------------------------------------------
+    | SATA Posture Reference Table v1 — Evidence Based.
+    | Every measured section (D1–D7 and the frontal/back parameters) resolves its
+    | reference through this hierarchy. The engine NEVER invents a cut-off: when
+    | no Level 1 or Level 2 reference exists the parameter is reported against the
+    | individual's own baseline (Level 3 — Evidence Gap).
+    |
+    |   - published           : Level 1 — normative value from a published study.
+    |   - sata_validated      : Level 2 — reference validated by SATA (for example
+    |                           a definitional neutral such as 0° for a level line).
+    |   - individual_baseline : Level 3 — Evidence Gap. The first assessment is stored
+    |                           as the baseline and later assessments are reported as
+    |                           change from baseline. No population cut-off is created.
+    */
+    'reference_levels' => [
+        'published'           => ['rank' => 1, 'label' => 'Published Reference',                'approved' => true],
+        'sata_validated'      => ['rank' => 2, 'label' => 'SATA Validated Reference',           'approved' => true],
+        'individual_baseline' => ['rank' => 3, 'label' => 'Individual Baseline (Evidence Gap)', 'approved' => false],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SATA Posture Reference Table v1 — Evidence Based (D1–D7)
+    |--------------------------------------------------------------------------
+    | LOCKED DEVELOPER REFERENCE — SAGITTAL POSTURE — DEVIATION ANGLE OUTPUT.
+    |
+    | Output standard: D1–D7 are displayed as deviation angles.
+    |   0°      = the measured value is exactly at the applicable reference.
+    |   +/-     = the direction and magnitude of deviation from that reference.
+    |
+    | Core formula: Deviation Angle = Measured Angle − Applicable Reference Value.
+    |
+    | Every parameter resolves its reference per SATA age group (and, only where
+    | the evidence requires it, per sex). A parameter is either:
+    |   - 'published'           : Level 1 — a real published/normative value. The
+    |                             reference centre (`value`) and the published
+    |                             band (`min`/`max`) are stored. The band's own
+    |                             half-width is the tolerance used for the
+    |                             On Point / Near Point / Off Point output — NO
+    |                             arbitrary ±5° / ±10° cut-off is invented.
+    |   - 'individual_baseline' : Level 3 — Evidence Gap. No population reference
+    |                             exists, so the first assessment is stored as the
+    |                             individual's baseline and later assessments are
+    |                             reported as change from that baseline.
+    |
+    | `sections` lists the app measurement sections this parameter feeds, so the
+    | seeder can expand one locked parameter into the right per-view rows.
+    | `sex_if_required` marks the parameters whose evidence is sex-dependent.
+    */
+    'posture_reference_table' => [
+        'D1' => [
+            'label' => 'Body Alignment',
+            'region' => 'alignment',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'C1', 'view' => 'right_side'],
+                ['section' => 'D1', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — body alignment (0° neutral)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — body alignment (0° neutral)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — body alignment (0° neutral)'],
+                '19-49' => [
+                    'level' => 'published', 'value' => 1.73, 'min' => 0.79, 'max' => 2.67,
+                    'source' => 'Published systematic review — adult body-alignment reference (1.73 ± 0.94)**',
+                ],
+                '50+' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — body alignment (0° neutral)'],
+            ],
+        ],
+        'D2' => [
+            'label' => 'Head',
+            'region' => 'head',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'side_cva', 'view' => 'right_side'],
+                ['section' => 'side_cva', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => [
+                    'level' => 'published', 'value' => 49.3, 'min' => 44.0, 'max' => 54.6,
+                    'source' => '2025 paediatric photogrammetry — head posture angle (7–9 y)†',
+                ],
+                '9-12' => [
+                    'level' => 'published', 'value' => 48.9, 'min' => 43.7, 'max' => 54.1,
+                    'source' => '2025 paediatric photogrammetry — head posture angle (10–14 y)†',
+                ],
+                '13-18' => [
+                    'level' => 'published', 'value' => 51.5, 'min' => 46.4, 'max' => 56.6,
+                    'source' => '2025 paediatric photogrammetry — head posture angle (15–17 y)†',
+                ],
+                '19-49' => [
+                    'level' => 'published', 'value' => 51.42, 'min' => 46.55, 'max' => 56.29,
+                    'source' => 'Published systematic review — adult head posture angle (51.42 ± 4.87)**',
+                ],
+                '50+' => ['level' => 'sata_validated', 'value' => 48.0, 'min' => 43.1, 'max' => 52.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — CVA / head reference (≥50 y, 48°)'],
+            ],
+        ],
+        'D3' => [
+            'label' => 'Shoulder',
+            'region' => 'shoulder',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'C3', 'view' => 'right_side'],
+                ['section' => 'D3', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => [
+                    'level' => 'published', 'value' => 64.5, 'min' => 52.7, 'max' => 76.3,
+                    'source' => '2025 paediatric photogrammetry — shoulder angle (7–9 y)†',
+                ],
+                '9-12' => [
+                    'level' => 'published', 'value' => 69.2, 'min' => 57.3, 'max' => 81.1,
+                    'source' => '2025 paediatric photogrammetry — shoulder angle (10–14 y)†',
+                ],
+                '13-18' => [
+                    'level' => 'published', 'value' => 72.4, 'min' => 58.9, 'max' => 85.9,
+                    'source' => '2025 paediatric photogrammetry — shoulder angle (15–17 y)†',
+                ],
+                '19-49' => ['level' => 'individual_baseline'],
+                '50+' => ['level' => 'individual_baseline'],
+            ],
+        ],
+        'D4' => [
+            'label' => 'Pelvic Tilt',
+            'region' => 'pelvis',
+            'sex_if_required' => true,
+            'sections' => [
+                ['section' => 'C4', 'view' => 'right_side'],
+                ['section' => 'D4', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => [
+                    'male' => ['level' => 'published', 'value' => 12.6, 'min' => 7.8, 'max' => 17.4, 'source' => '2025 paediatric photogrammetry — pelvic tilt, boys (7–17 y)†'],
+                    'female' => ['level' => 'published', 'value' => 14.7, 'min' => 9.8, 'max' => 19.6, 'source' => '2025 paediatric photogrammetry — pelvic tilt, girls (7–17 y)†'],
+                ],
+                '9-12' => [
+                    'male' => ['level' => 'published', 'value' => 12.6, 'min' => 7.8, 'max' => 17.4, 'source' => '2025 paediatric photogrammetry — pelvic tilt, boys (7–17 y)†'],
+                    'female' => ['level' => 'published', 'value' => 14.7, 'min' => 9.8, 'max' => 19.6, 'source' => '2025 paediatric photogrammetry — pelvic tilt, girls (7–17 y)†'],
+                ],
+                '13-18' => [
+                    'male' => ['level' => 'published', 'value' => 12.6, 'min' => 7.8, 'max' => 17.4, 'source' => '2025 paediatric photogrammetry — pelvic tilt, boys (7–17 y)†'],
+                    'female' => ['level' => 'published', 'value' => 14.7, 'min' => 9.8, 'max' => 19.6, 'source' => '2025 paediatric photogrammetry — pelvic tilt, girls (7–17 y)†'],
+                ],
+                '19-49' => [
+                    'level' => 'published', 'value' => -12.26, 'min' => -18.07, 'max' => -6.45,
+                    'source' => 'Published systematic review — adult pelvic tilt (−12.26 ± 5.81)**',
+                ],
+                '50+' => ['level' => 'individual_baseline'],
+            ],
+        ],
+        'D5' => [
+            'label' => 'Knee',
+            'region' => 'lower_limb',
+            'sex_if_required' => true,
+            'sections' => [
+                ['section' => 'C5', 'view' => 'right_side'],
+                ['section' => 'D5', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => [
+                    'male' => ['level' => 'published', 'value' => 173.1, 'min' => 167.1, 'max' => 179.1, 'source' => '2025 paediatric photogrammetry — knee angle, boys (7–9 y)†'],
+                    'female' => ['level' => 'published', 'value' => 179.0, 'min' => 178.5, 'max' => 179.5, 'source' => '2025 paediatric photogrammetry — knee angle, girls (7–9 y)†'],
+                ],
+                '9-12' => [
+                    'male' => ['level' => 'published', 'value' => 172.3, 'min' => 167.7, 'max' => 176.9, 'source' => '2025 paediatric photogrammetry — knee angle, boys (10–14 y)†'],
+                    'female' => ['level' => 'published', 'value' => 174.9, 'min' => 170.1, 'max' => 179.7, 'source' => '2025 paediatric photogrammetry — knee angle, girls (10–14 y)†'],
+                ],
+                '13-18' => [
+                    'male' => ['level' => 'published', 'value' => 174.0, 'min' => 169.5, 'max' => 178.5, 'source' => '2025 paediatric photogrammetry — knee angle, boys (15–17 y)†'],
+                    'female' => ['level' => 'published', 'value' => 173.1, 'min' => 166.9, 'max' => 179.3, 'source' => '2025 paediatric photogrammetry — knee angle, girls (15–17 y)†'],
+                ],
+                '19-49' => ['level' => 'individual_baseline'],
+                '50+' => ['level' => 'individual_baseline'],
+            ],
+        ],
+        'D6' => [
+            'label' => 'Tibia Alignment',
+            'region' => 'lower_limb',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'C6', 'view' => 'right_side'],
+                ['section' => 'D6', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — tibia alignment (0° neutral)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — tibia alignment (0° neutral)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — tibia alignment (0° neutral)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — tibia alignment (0° neutral)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — tibia alignment (0° neutral)'],
+            ],
+        ],
+        'D7' => [
+            'label' => 'Foot/Ankle Alignment',
+            'region' => 'lower_limb',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'C7', 'view' => 'right_side'],
+                ['section' => 'D7', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — foot/ankle angle (0° neutral)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — foot/ankle angle (0° neutral)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — foot/ankle angle (0° neutral)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — foot/ankle angle (0° neutral)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — foot/ankle angle (0° neutral)'],
+            ],
+        ],
+
+        /*
+        | The side-view parameters below were previously Evidence Gaps (no entry
+        | in this table => the seeder stored a NULL reference). Their SATA v1.1
+        | fixed references are added here so the engine can compute a deviation
+        | instead of falling back to baseline/change tracking.
+        |
+        | Band: the SATA v1.1 locked classification defines NORMAL as a 0–4.9°
+        | deviation for every parameter, so the tolerance is ±4.9° (on_point =
+        | NORMAL, near_point = MILD, off_point = MODERATE/SEVERE).
+        */
+        'head_shift' => [
+            'label' => 'Head Shift',
+            'region' => 'head',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'C2', 'view' => 'right_side'],
+                ['section' => 'D2', 'view' => 'left_side'],
+            ],
+            'groups' => [
+                '6-8' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — head shift (0° neutral)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — head shift (0° neutral)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — head shift (0° neutral)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — head shift (0° neutral)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -4.9, 'max' => 4.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — head shift (0° neutral)'],
+            ],
+        ],
+        'thoracic_kyphosis' => [
+            'label' => 'Upper-Back Posture Indicator',
+            'region' => 'thoracic',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'side_kyphosis', 'view' => 'right_side'],
+            ],
+            'groups' => [
+                '6-8' => ['level' => 'sata_validated', 'value' => 40.0, 'min' => 35.1, 'max' => 44.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — thoracic kyphosis (6–8 y, 40°)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 44.0, 'min' => 39.1, 'max' => 48.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — thoracic kyphosis (9–12 y, 44°)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 45.0, 'min' => 40.1, 'max' => 49.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — thoracic kyphosis (13–18 y, 45°)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 40.0, 'min' => 35.1, 'max' => 44.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — thoracic kyphosis (19–49 y, 40°)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 46.0, 'min' => 41.1, 'max' => 50.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — thoracic kyphosis (≥50 y, 46°)'],
+            ],
+        ],
+        'lumbar_lordosis' => [
+            'label' => 'Lower-Back Posture Indicator',
+            'region' => 'pelvis',
+            'sex_if_required' => false,
+            'sections' => [
+                ['section' => 'side_lordosis', 'view' => 'right_side'],
+            ],
+            'groups' => [
+                '6-8' => ['level' => 'sata_validated', 'value' => 54.0, 'min' => 49.1, 'max' => 58.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — lumbar lordosis (6–8 y, 54°)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 55.0, 'min' => 50.1, 'max' => 59.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — lumbar lordosis (9–12 y, 55°)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 55.0, 'min' => 50.1, 'max' => 59.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — lumbar lordosis (13–18 y, 55°)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 45.0, 'min' => 40.1, 'max' => 49.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — lumbar lordosis (19–49 y, 45°)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 40.0, 'min' => 35.1, 'max' => 44.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — lumbar lordosis (≥50 y, 40°)'],
+            ],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Sagittal Classification Parameters
+    |--------------------------------------------------------------------------
+    | Kyphosis, Lordosis, Flat Back and Sway Back are classification outputs
+    | derived from a COMBINATION of the D1–D7 sagittal deviation angles, never
+    | from a single angle. These are the parameter keys used by the decision
+    | rules. `translation` highlights the one parameter that separates Sway Back
+    | (forward/anterior pelvic translation) from Flat Back (posterior pelvic
+    | deviation without dominant forward translation).
+    */
+    'sagittal_parameters' => [
+        'D1' => ['label' => 'Body Alignment',        'sections' => ['C1', 'D1']],
+        'D2' => ['label' => 'Head',                  'sections' => ['side_cva']],
+        'D3' => ['label' => 'Shoulder',              'sections' => ['C3', 'D3']],
+        'D4' => ['label' => 'Pelvic Tilt',           'sections' => ['C4', 'D4']],
+        'D5' => ['label' => 'Knee',                  'sections' => ['C5', 'D5']],
+        'D6' => ['label' => 'Tibia Alignment',       'sections' => ['C6', 'D6']],
+        'D7' => ['label' => 'Foot / Ankle Alignment','sections' => ['C7', 'D7']],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | SATA Posture Output Status (user-facing)
+    |--------------------------------------------------------------------------
+    | The ONLY user-facing alignment status for a deviation angle. On Point /
+    | Near Point / Off Point may only be generated when the parameter has an
+    | APPROVED cut-off (a Level 1 or Level 2 reference). When no approved
+    | reference exists the engine reports `baseline_tracking` and never forces a
+    | point status.
+    |
+    | `deviation_bands` maps the size of the deviation to an output status. Bands
+    | are expressed as a multiple of the reference's own tolerance (the standard
+    | deviation published with the reference, or half the published range). This
+    | avoids arbitrary universal cut-offs such as ±5° / ±10°.
+    */
+    'posture_output_statuses' => [
+        'on_point'          => ['label' => 'On Point',                    'color' => 'green',  'correction' => 'ON POINT'],
+        'near_point'        => ['label' => 'Near Point',                  'color' => 'yellow', 'correction' => 'NEAR POINT'],
+        'off_point'         => ['label' => 'Off Point',                   'color' => 'orange', 'correction' => 'OFF POINT'],
+        'baseline_tracking' => ['label' => 'Baseline / Change Tracking',  'color' => 'blue',   'correction' => 'BASELINE TRACKING'],
+        'review'            => ['label' => 'Review',                      'color' => 'grey',   'correction' => 'REVIEW'],
+    ],
+
+    'deviation_bands' => [
+        // |deviation| <= tolerance            => on_point
+        // tolerance < |deviation| <= 2·tol     => near_point
+        // |deviation| > 2·tolerance            => off_point
+        'on_point'   => 1.0,
+        'near_point' => 2.0,
+    ],
+
+    // Internal severity level kept for the decision engine, derived from the
+    // output status so the existing rule conditions (normal/mild/moderate/
+    // severe) continue to work without hard-coded cut-offs.
+    'status_to_level' => [
+        'on_point'          => 'normal',
+        'near_point'        => 'mild',
+        'off_point'         => 'moderate',
+        'baseline_tracking' => 'baseline',
+        'review'            => 'review',
+    ],
+
+    'level_to_status' => [
+        'normal'   => 'on_point',
+        'mild'     => 'near_point',
+        'moderate' => 'off_point',
+        'severe'   => 'off_point',
+        'baseline' => 'baseline_tracking',
+        'review'   => 'review',
     ],
 
     /*
@@ -215,8 +557,11 @@ return [
     |--------------------------------------------------------------------------
     | Measurement Definitions
     |--------------------------------------------------------------------------
-    | Maps section codes to labels, views, normal ranges, body region and the
-    | angle interpretation mode.
+    | Maps section codes to labels, views, body region and the angle
+    | interpretation mode. Reference values NO LONGER live here: each section
+    | resolves its reference at run time through the SATA reference hierarchy
+    | (see `posture_reference_table` + `reference_levels`). `reference_level` is
+    | the DEFAULT level used when no reference row is stored for a parameter.
     |
     | `angle_mode`:
     |   - `angle`       : full 0-360 circle. Deviation is normalised to the
@@ -229,42 +574,42 @@ return [
     |                     angles, foot rotation).
     */
     'measurements' => [
-        'A1'  => ['view' => 'front', 'label' => 'Body Alignment', 'region' => 'alignment', 'normal_min' => -1, 'normal_max' => 1],
-        'A2'  => ['view' => 'front', 'label' => 'Head Tilt', 'region' => 'head', 'angle_mode' => 'orientation', 'normal_min' => -1, 'normal_max' => 1],
-        'A3'  => ['view' => 'front', 'label' => 'Shoulder Alignment', 'region' => 'shoulder', 'angle_mode' => 'orientation', 'normal_min' => -1, 'normal_max' => 1],
-        'A4'  => ['view' => 'front', 'label' => 'Axillae Alignment', 'region' => 'thoracic', 'normal_min' => -1, 'normal_max' => 1],
-        'A5'  => ['view' => 'front', 'label' => 'Ribcage Tilt', 'region' => 'thoracic', 'normal_min' => -1, 'normal_max' => 1],
-        'A6'  => ['view' => 'front', 'label' => 'Trunk Alignment', 'region' => 'thoracic', 'normal_min' => -1, 'normal_max' => 1],
-        'A7'  => ['view' => 'front', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'angle_mode' => 'orientation', 'normal_min' => -1, 'normal_max' => 1],
-        'A8'  => ['view' => 'front', 'label' => 'Right Knee Angle', 'region' => 'lower_limb', 'side' => 'right', 'angle_mode' => 'orientation', 'normal_min' => -2, 'normal_max' => 2],
-        'A9'  => ['view' => 'front', 'label' => 'Left Knee Angle', 'region' => 'lower_limb', 'side' => 'left', 'angle_mode' => 'orientation', 'normal_min' => -2, 'normal_max' => 2],
-        'A10' => ['view' => 'front', 'label' => 'Right Foot Rotation', 'region' => 'lower_limb', 'side' => 'right', 'angle_mode' => 'orientation', 'normal_min' => -5, 'normal_max' => 5],
-        'A11' => ['view' => 'front', 'label' => 'Left Foot Rotation', 'region' => 'lower_limb', 'side' => 'left', 'angle_mode' => 'orientation', 'normal_min' => -5, 'normal_max' => 5],
-        'B1'  => ['view' => 'back', 'label' => 'Body Alignment', 'region' => 'alignment', 'normal_min' => -1, 'normal_max' => 1],
-        'B2'  => ['view' => 'back', 'label' => 'Head Tilt', 'region' => 'head', 'angle_mode' => 'orientation', 'normal_min' => -1, 'normal_max' => 1],
-        'B3'  => ['view' => 'back', 'label' => 'Shoulder Alignment', 'region' => 'shoulder', 'angle_mode' => 'orientation', 'normal_min' => -1, 'normal_max' => 1],
-        'B4'  => ['view' => 'back', 'label' => 'Axillae Alignment', 'region' => 'thoracic', 'normal_min' => -1, 'normal_max' => 1],
-        'B5'  => ['view' => 'back', 'label' => 'Trunk Alignment', 'region' => 'thoracic', 'normal_min' => -1, 'normal_max' => 1],
-        'B6'  => ['view' => 'back', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'angle_mode' => 'orientation', 'normal_min' => -1, 'normal_max' => 1],
-        'B7'  => ['view' => 'back', 'label' => 'Knees', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'normal_min' => -2, 'normal_max' => 2],
-        'B8'  => ['view' => 'back', 'label' => 'Feet', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'normal_min' => -2, 'normal_max' => 2],
-        'C1'  => ['view' => 'right_side', 'label' => 'Body Alignment', 'region' => 'alignment', 'normal_min' => -2, 'normal_max' => 2],
-        'C2'  => ['view' => 'right_side', 'label' => 'Head Shift', 'region' => 'head', 'normal_min' => -5, 'normal_max' => 10],
-        'C3'  => ['view' => 'right_side', 'label' => 'Shoulder Angle', 'region' => 'shoulder', 'normal_min' => -5, 'normal_max' => 10],
-        'C4'  => ['view' => 'right_side', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'normal_min' => -2, 'normal_max' => 5],
-        'C5'  => ['view' => 'right_side', 'label' => 'Knee', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'normal_min' => -2, 'normal_max' => 2],
-        'C6'  => ['view' => 'right_side', 'label' => 'Tibia', 'region' => 'lower_limb', 'normal_min' => -5, 'normal_max' => 5],
-        'C7'  => ['view' => 'right_side', 'label' => 'Foot Angle', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'normal_min' => -5, 'normal_max' => 10],
-        'D1'  => ['view' => 'left_side', 'label' => 'Body Alignment', 'region' => 'alignment', 'normal_min' => -2, 'normal_max' => 2],
-        'D2'  => ['view' => 'left_side', 'label' => 'Head Shift', 'region' => 'head', 'normal_min' => -5, 'normal_max' => 10],
-        'D3'  => ['view' => 'left_side', 'label' => 'Shoulder Angle', 'region' => 'shoulder', 'normal_min' => -5, 'normal_max' => 10],
-        'D4'  => ['view' => 'left_side', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'normal_min' => -2, 'normal_max' => 5],
-        'D5'  => ['view' => 'left_side', 'label' => 'Knee', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'normal_min' => -2, 'normal_max' => 2],
-        'D6'  => ['view' => 'left_side', 'label' => 'Tibia', 'region' => 'lower_limb', 'normal_min' => -5, 'normal_max' => 5],
-        'D7'  => ['view' => 'left_side', 'label' => 'Foot Angle', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'normal_min' => -5, 'normal_max' => 10],
-        'side_cva'       => ['view' => 'right_side', 'label' => 'CVA / Head Reference', 'region' => 'head', 'normal_min' => 45, 'normal_max' => 55],
-        'side_kyphosis'  => ['view' => 'right_side', 'label' => 'Upper-Back Posture Indicator', 'region' => 'thoracic', 'normal_min' => 35, 'normal_max' => 50],
-        'side_lordosis'  => ['view' => 'right_side', 'label' => 'Lower-Back Posture Indicator', 'region' => 'pelvis', 'normal_min' => 35, 'normal_max' => 55],
+        'A1'  => ['view' => 'front', 'label' => 'Body Alignment', 'region' => 'alignment', 'reference_level' => 'sata_validated'],
+        'A2'  => ['view' => 'front', 'label' => 'Head Tilt', 'region' => 'head', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'A3'  => ['view' => 'front', 'label' => 'Shoulder Alignment', 'region' => 'shoulder', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'A4'  => ['view' => 'front', 'label' => 'Axillae Alignment', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'A5'  => ['view' => 'front', 'label' => 'Ribcage Tilt', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'A6'  => ['view' => 'front', 'label' => 'Trunk Alignment', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'A7'  => ['view' => 'front', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'A8'  => ['view' => 'front', 'label' => 'Right Knee Angle', 'region' => 'lower_limb', 'side' => 'right', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'A9'  => ['view' => 'front', 'label' => 'Left Knee Angle', 'region' => 'lower_limb', 'side' => 'left', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'A10' => ['view' => 'front', 'label' => 'Right Foot Rotation', 'region' => 'lower_limb', 'side' => 'right', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'A11' => ['view' => 'front', 'label' => 'Left Foot Rotation', 'region' => 'lower_limb', 'side' => 'left', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'B1'  => ['view' => 'back', 'label' => 'Body Alignment', 'region' => 'alignment', 'reference_level' => 'sata_validated'],
+        'B2'  => ['view' => 'back', 'label' => 'Head Tilt', 'region' => 'head', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'B3'  => ['view' => 'back', 'label' => 'Shoulder Alignment', 'region' => 'shoulder', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'B4'  => ['view' => 'back', 'label' => 'Axillae Alignment', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'B5'  => ['view' => 'back', 'label' => 'Trunk Alignment', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'B6'  => ['view' => 'back', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'B7'  => ['view' => 'back', 'label' => 'Knees', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'B8'  => ['view' => 'back', 'label' => 'Feet', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'C1'  => ['view' => 'right_side', 'label' => 'Body Alignment', 'region' => 'alignment', 'reference_level' => 'individual_baseline'],
+        'C2'  => ['view' => 'right_side', 'label' => 'Head Shift', 'region' => 'head', 'reference_level' => 'individual_baseline'],
+        'C3'  => ['view' => 'right_side', 'label' => 'Shoulder Angle', 'region' => 'shoulder', 'reference_level' => 'individual_baseline'],
+        'C4'  => ['view' => 'right_side', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'reference_level' => 'individual_baseline'],
+        'C5'  => ['view' => 'right_side', 'label' => 'Knee', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
+        'C6'  => ['view' => 'right_side', 'label' => 'Tibia', 'region' => 'lower_limb', 'reference_level' => 'individual_baseline'],
+        'C7'  => ['view' => 'right_side', 'label' => 'Foot Angle', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
+        'D1'  => ['view' => 'left_side', 'label' => 'Body Alignment', 'region' => 'alignment', 'reference_level' => 'individual_baseline'],
+        'D2'  => ['view' => 'left_side', 'label' => 'Head Shift', 'region' => 'head', 'reference_level' => 'individual_baseline'],
+        'D3'  => ['view' => 'left_side', 'label' => 'Shoulder Angle', 'region' => 'shoulder', 'reference_level' => 'individual_baseline'],
+        'D4'  => ['view' => 'left_side', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'reference_level' => 'individual_baseline'],
+        'D5'  => ['view' => 'left_side', 'label' => 'Knee', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
+        'D6'  => ['view' => 'left_side', 'label' => 'Tibia', 'region' => 'lower_limb', 'reference_level' => 'individual_baseline'],
+        'D7'  => ['view' => 'left_side', 'label' => 'Foot Angle', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
+        'side_cva'       => ['view' => 'right_side', 'label' => 'CVA / Head Reference', 'region' => 'head', 'reference_level' => 'sata_validated'],
+        'side_kyphosis'  => ['view' => 'right_side', 'label' => 'Upper-Back Posture Indicator', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'side_lordosis'  => ['view' => 'right_side', 'label' => 'Lower-Back Posture Indicator', 'region' => 'pelvis', 'reference_level' => 'sata_validated'],
     ],
 
     /*
@@ -417,23 +762,23 @@ return [
         ],
         'Kyphosis' => [
             'description' => 'Excessive thoracic curvature (hunched upper back)',
-            'key_indicators' => ['C3_high', 'D3_high', 'C2_high', 'D2_high'],
+            'key_indicators' => ['D1_forward', 'D2_forward', 'D3_forward'],
         ],
         'Lordosis' => [
             'description' => 'Excessive lumbar curvature (swayback)',
-            'key_indicators' => ['C4_high', 'D4_high', 'A7_high'],
+            'key_indicators' => ['D4_anterior'],
         ],
         'Kyphosis-Lordosis' => [
             'description' => 'Combined excessive thoracic and lumbar curvature',
-            'key_indicators' => ['side_kyphosis_high', 'side_lordosis_high'],
+            'key_indicators' => ['D1_forward', 'D2_forward', 'D3_forward', 'D4_anterior'],
         ],
         'Flat Back' => [
             'description' => 'Reduced spinal curves',
-            'key_indicators' => ['C4_low', 'D4_low', 'C3_low'],
+            'key_indicators' => ['D4_posterior', 'D6'],
         ],
         'Swayback' => [
             'description' => 'Posterior pelvic shift with anterior upper trunk',
-            'key_indicators' => ['C1_forward', 'D1_forward', 'C4_high'],
+            'key_indicators' => ['D1_forward', 'D3_forward', 'D5_extension'],
         ],
         'Flexed Knee' => [
             'description' => 'The knee is not fully extended in standing alignment',
@@ -506,72 +851,85 @@ return [
             'id' => 'KYPHOSIS',
             'classification' => 'Kyphosis',
             'severity' => 'moderate',
-            'requires' => ['side_kyphosis'],
-            'all' => [
-                ['section' => 'side_kyphosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
-            ],
+            'requires' => [],
+            'all' => [],
             'any' => [
+                ['section' => 'C1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'side_cva', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
-                ['section' => 'side_cva', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
             ],
-            'conclusion' => 'Kyphotic Posture — increased thoracic curvature with forward shoulder/head alignment.',
+            'conclusion' => 'Kyphotic Posture — forward trunk translation with a rounded shoulder/forward head pattern.',
         ],
         [
             'id' => 'LORDOSIS',
             'classification' => 'Lordosis',
             'severity' => 'moderate',
-            'requires' => ['side_lordosis'],
-            'all' => [
-                ['section' => 'side_lordosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
-            ],
+            'requires' => [],
+            'all' => [],
             'any' => [
                 ['section' => 'C4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
-            'conclusion' => 'Lordotic Posture — increased lumbar curve with anterior pelvic tilt.',
+            'conclusion' => 'Lordotic Posture — anterior pelvic deviation with an increased lumbar curve.',
         ],
         [
             'id' => 'KYPHOSIS_LORDOSIS',
             'classification' => 'Kyphosis-Lordosis',
             'severity' => 'moderate',
-            'requires' => ['side_kyphosis', 'side_lordosis'],
-            'all' => [
-                ['section' => 'side_kyphosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
-                ['section' => 'side_lordosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+            'requires' => [],
+            'all' => [],
+            'any' => [
+                ['section' => 'C1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'side_cva', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
-            'any' => [],
-            'conclusion' => 'Combined kyphosis and lordosis — increased thoracic and lumbar curves.',
+            'any2' => [
+                ['section' => 'C4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+            ],
+            'conclusion' => 'Combined kyphosis and lordosis — forward upper trunk together with an anterior pelvic deviation.',
         ],
         [
             'id' => 'FLATBACK',
             'classification' => 'Flat Back',
             'severity' => 'moderate',
-            'requires' => ['side_kyphosis', 'side_lordosis'],
-            'all' => [
-                ['section' => 'side_kyphosis', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
-                ['section' => 'side_lordosis', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
+            'requires' => [],
+            'all' => [],
+            'any' => [
+                ['section' => 'C4', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D4', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'C6', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D6', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
             ],
-            'any' => [],
-            'conclusion' => 'Flat back — both the thoracic and lumbar curves are reduced.',
+            'none' => [
+                ['section' => 'C1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+            ],
+            'conclusion' => 'Flat back — reduced lumbar curve with a posterior pelvic deviation and no dominant forward translation.',
         ],
         [
             'id' => 'SWAYBACK',
             'classification' => 'Swayback',
             'severity' => 'moderate',
-            'requires' => ['C1', 'D1'],
+            'requires' => [],
             'all' => [],
             'any' => [
                 ['section' => 'C1', 'direction' => 'above', 'level' => ['moderate', 'severe']],
                 ['section' => 'D1', 'direction' => 'above', 'level' => ['moderate', 'severe']],
             ],
             'any2' => [
-                ['section' => 'C4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
-                ['section' => 'D4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'C5', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'D5', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
-            'conclusion' => 'Swayback — posterior pelvic shift with an anterior upper trunk.',
+            'conclusion' => 'Swayback — forward pelvic/trunk translation with an altered upper trunk and lower-limb extension.',
         ],
         [
             'id' => 'FLEXED_KNEE',
@@ -681,9 +1039,9 @@ return [
     | Confirmable Posture Classifications
     |--------------------------------------------------------------------------
     | The complete list of posture types the system is allowed to confirm.
-    | Any other matched pattern (forward head, rounded shoulder, pelvic
-    | obliquity, ...) is reported as a suspected or secondary finding only and
-    | never stored as a posture diagnosis.
+    | Any other matched pattern (rounded shoulder, pelvic obliquity, ...) is
+    | reported as a suspected or secondary finding only and never stored as a
+    | posture diagnosis.
     */
     'confirmable_classifications' => [
         'Normal',
@@ -694,6 +1052,7 @@ return [
         'Flat Back',
         'Flexed Knee',
         'Genu Recurvatum',
+        'Forward Head',
     ],
 
     /*
@@ -912,6 +1271,75 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Muscle Marker Regions
+    |--------------------------------------------------------------------------
+    | Which measurement region grades each body marker. The app colours a
+    | muscle with the worst output status found in its region, so one photo can
+    | show a yellow neck next to an orange chest and a red thigh. A marker with
+    | no region (the biceps has no angle of its own) keeps its set's band.
+    */
+    'marker_regions' => [
+        'front' => [
+            'Neck / SCM' => ['head'],
+            'Chest L' => ['shoulder', 'thoracic'],
+            'Chest R' => ['shoulder', 'thoracic'],
+            'Biceps L' => [],
+            'Biceps R' => [],
+            'Core' => ['thoracic', 'pelvis'],
+            'Thigh L' => ['lower_limb'],
+            'Thigh R' => ['lower_limb'],
+            'Calf L' => ['lower_limb'],
+            'Calf R' => ['lower_limb'],
+        ],
+        'back' => [
+            'Upper Trap' => ['head', 'shoulder'],
+            'Rhomboids' => ['thoracic'],
+            'Lat L' => ['thoracic'],
+            'Lat R' => ['thoracic'],
+            'Erector Spinae' => ['thoracic'],
+            'Hamstring L' => ['lower_limb'],
+            'Hamstring R' => ['lower_limb'],
+            'Calf L' => ['lower_limb'],
+            'Calf R' => ['lower_limb'],
+        ],
+        'right_side' => [
+            'Head / Neck' => ['head'],
+            'Chest' => ['shoulder', 'thoracic'],
+            'Thoracic' => ['thoracic'],
+            'Abdominal' => ['thoracic', 'pelvis'],
+            'Gluteus' => ['pelvis'],
+            'Upper Leg' => ['lower_limb'],
+            'Lower Leg' => ['lower_limb'],
+        ],
+        'left_side' => [
+            'Head / Neck' => ['head'],
+            'Chest' => ['shoulder', 'thoracic'],
+            'Thoracic' => ['thoracic'],
+            'Abdominal' => ['thoracic', 'pelvis'],
+            'Gluteus' => ['pelvis'],
+            'Upper Leg' => ['lower_limb'],
+            'Lower Leg' => ['lower_limb'],
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Muscle Marker Status Labels
+    |--------------------------------------------------------------------------
+    | The ONE label a body marker prints. The highlight colour already says how
+    | marked the finding is (normal = yellow, moderate = orange, severe = red),
+    | so the label names the muscle's own state instead of repeating the band:
+    | a weak muscle (Core, Glutes, Lats) is never called tight, while a tight
+    | muscle reads "Tight" at the moderate band.
+    */
+    'marker_status_labels' => [
+        'normal' => ['tight' => 'Normal', 'weak' => 'Normal'],
+        'moderate' => ['tight' => 'Tight', 'weak' => 'Weak'],
+        'severe' => ['tight' => 'Severe', 'weak' => 'Severe'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Posture Conditions (SATA Figures 1–12)
     |--------------------------------------------------------------------------
     | The posture classifications used by the body-marker editor. Each key is a
@@ -1010,4 +1438,66 @@ return [
     | general-conditioning catalogue instead of a condition-specific program.
     */
     'intervention_fallback_posture_type' => 'normal_neutral',
+
+    /*
+    |--------------------------------------------------------------------------
+    | SATA Aquatic Skills Assessment Checklist
+    |--------------------------------------------------------------------------
+    | The 35-item checklist a student is assessed against before each posture
+    | capture. Yes = 1 point, No = 0, so the maximum score is one point per
+    | item. Kept in config because the checklist is a fixed, versioned
+    | instrument: the item numbers are the keys stored against an assessment,
+    | so retitling an item must never renumber it.
+    |
+    | `categories` carries the order and the denominator each category is
+    | scored out of, which the progress chart needs to show every category as
+    | a percentage — the four hold different numbers of items, so raw counts
+    | would flatter the longest category.
+    */
+    'aquatic_skills' => [
+        'version' => 'Draft 1.0 (14 October 2026)',
+        'categories' => [
+            'readiness' => 'Readiness to Participate in Swimming Lessons',
+            'basic_control' => 'Basic Control and Fundamental Skills',
+            'basic_swimming' => 'Basic Swimming Skills',
+            'advanced' => 'Advanced Swimming Movements',
+        ],
+        'items' => [
+            1 => ['category' => 'readiness', 'text' => 'Can the student independently walk to the swimming pool and sit in the designated area?'],
+            2 => ['category' => 'readiness', 'text' => 'Can the student enter the pool calmly?'],
+            3 => ['category' => 'readiness', 'text' => "Can the student tolerate the instructor's touch?"],
+            4 => ['category' => 'readiness', 'text' => 'Can the student wear a swim cap and goggles?'],
+            5 => ['category' => 'readiness', 'text' => 'Can the student make eye contact with the instructor during class?'],
+            6 => ['category' => 'readiness', 'text' => "Can the student focus on and follow the instructor's directions?"],
+            7 => ['category' => 'readiness', 'text' => 'Can the student understand and respond to nonverbal cues, such as hand signals or touch?'],
+            8 => ['category' => 'readiness', 'text' => 'Can the student understand and follow brief verbal instructions consisting of three to five words?'],
+            9 => ['category' => 'readiness', 'text' => 'Can the student respond calmly to firm instructions from the instructor?'],
+            10 => ['category' => 'basic_control', 'text' => 'Can the student enter the swimming pool at the deep end while being supported by the instructor?'],
+            11 => ['category' => 'basic_control', 'text' => 'Can the student allow water to be poured over their head?'],
+            12 => ['category' => 'basic_control', 'text' => 'Can the student submerge their face in the water with assistance for 2-5 seconds?'],
+            13 => ['category' => 'basic_control', 'text' => "Can the student tolerate the instructor's touch during stretching and massage activities?"],
+            14 => ['category' => 'basic_control', 'text' => 'Can the student understand how to use and hold a flotation device while in the water?'],
+            15 => ['category' => 'basic_control', 'text' => 'Can the student relax their muscles during gentle push-and-pull movements?'],
+            16 => ['category' => 'basic_swimming', 'text' => 'Can the student blow bubbles by exhaling into the water?'],
+            17 => ['category' => 'basic_swimming', 'text' => 'Can the student lift and lower their head in a controlled manner?'],
+            18 => ['category' => 'basic_swimming', 'text' => 'Can the student maintain a streamlined body position with their legs lifted in the water?'],
+            19 => ['category' => 'basic_swimming', 'text' => 'Can the student use their arms to paddle through the water and move forward?'],
+            20 => ['category' => 'basic_swimming', 'text' => 'Can the student kick or tread water to maintain their body position?'],
+            21 => ['category' => 'basic_swimming', 'text' => 'Can the student tread water without assistance for 30 seconds?'],
+            22 => ['category' => 'basic_swimming', 'text' => 'Can the student swim four metres in a straight line from the instructor to the pool wall, without a flotation device or physical assistance?'],
+            23 => ['category' => 'basic_swimming', 'text' => 'Can the student roll their body to the left and right in the water?'],
+            24 => ['category' => 'basic_swimming', 'text' => 'Can the student rotate from a prone to a supine position in the water?'],
+            25 => ['category' => 'advanced', 'text' => 'Can the student swim 5 meters in a straight line from the instructor to the pool wall without a flotation device or physical assistance?'],
+            26 => ['category' => 'advanced', 'text' => "Can the student swim a longer distance following the instructor's directions?"],
+            27 => ['category' => 'advanced', 'text' => 'Can the student perform bilateral arm movements?'],
+            28 => ['category' => 'advanced', 'text' => 'Can the student perform flutter kicks independently?'],
+            29 => ['category' => 'advanced', 'text' => 'Can the student coordinate bilateral arm movements and flutter kicks simultaneously?'],
+            30 => ['category' => 'advanced', 'text' => 'Can the student perform basic breaststroke arm movements using the sequence clap, push, and open in a circular motion?'],
+            31 => ['category' => 'advanced', 'text' => 'Can the student perform basic breaststroke leg movements using the sequence draw in, open, kick, and bring the legs together?'],
+            32 => ['category' => 'advanced', 'text' => 'Can the student coordinate breaststroke arm and leg movements?'],
+            33 => ['category' => 'advanced', 'text' => 'Can the student maintain a horizontal body position while floating on their back?'],
+            34 => ['category' => 'advanced', 'text' => 'Can the student move one arm backward in a circular motion?'],
+            35 => ['category' => 'advanced', 'text' => 'Can the student coordinate alternating arm movements with flutter kicks?'],
+        ],
+    ],
 ];

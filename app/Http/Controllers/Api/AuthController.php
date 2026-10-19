@@ -24,12 +24,17 @@ class AuthController extends Controller
                 'token' => $token,
                 'data' => $user
             ], 200);
-        } else {
-            return response()->json([
-                'error' => 'Invalid credentials',
-                'data' => null
-            ], 401);
         }
+
+        // Report which half of the sign-in failed, so the app can offer the
+        // matching way out: create the account, or retype the password.
+        $registered = User::where('email', $credentials['email'] ?? '')->exists();
+
+        return response()->json([
+            'error' => $registered ? 'Incorrect password' : 'Email is not registered',
+            'code' => $registered ? 'invalid_password' : 'email_not_registered',
+            'data' => null
+        ], 401);
     }
 
     public function register(Request $request)

@@ -56,12 +56,12 @@ class AssessmentController extends Controller
             'weeklyPrograms',
         ]);
 
-        $viewMeasurements = [];
-        foreach (['front', 'back', 'right_side', 'left_side'] as $view) {
-            $viewMeasurements[$view] = $postureAssessment->measurements
-                ->where('view', $view)
-                ->values();
-        }
+        // SATA uses one calculation engine for every surface: the PDF, the
+        // results table, the database, the admin show page AND the Word export
+        // all read the same enriched measurements. Deviation angle is the
+        // primary user-facing value; the raw anatomical angle stays in the
+        // audit trail only.
+        $viewMeasurements = $this->interpretationEngine->measurementsByView($postureAssessment);
 
         $html = $this->buildWordHtml($postureAssessment, $viewMeasurements);
 
@@ -78,11 +78,15 @@ class AssessmentController extends Controller
     /**
      * Download the branded PDF version of the assessment report. The PDF is
      * rendered by the backend so the admin panel and the mobile app share the
-     * exact same document.
+     * exact same base document.
+     *
+     * The admin panel asks for the extended report, which appends the full
+     * per-view angle breakdown pages. The mobile app keeps the standard report,
+     * so its document is unchanged.
      */
     public function generatePdf(PostureAssessment $postureAssessment, SpariskReportPdfService $pdf)
     {
-        return $pdf->download($postureAssessment);
+        return $pdf->download($postureAssessment, true);
     }
 
     private function buildWordHtml(PostureAssessment $a, array $viewMeasurements): string
@@ -136,31 +140,72 @@ class AssessmentController extends Controller
             $h .= '</table>';
         }
 
-        // Measurements by view
-        $h .= '<h2>Measurements by View</h2>';
+        // Measurements by view — SATA deviation-angle-only output.
+        // Every cell is read from the same enriched payload the PDF, the admin
+        // show page and the mobile app use, so the values can never disagree.
+        $outputStatuses = config('sparisk.posture_output_statuses');
+        $referenceLevels = config('sparisk.reference_levels');
+        $h .= '<h2>Measurements by View — SATA Deviation Angle Output</h2>';
+        $h .= '<p class="muted">Deviation = Measured Angle − Applicable Reference Value. '
+            . '0° means the measurement is on the reference; +/− shows the direction and size. '
+            . 'Parameters with no approved population reference are tracked against the '
+            . 'individual&apos;s first assessment (Baseline / Change Tracking).</p>';
         foreach ($viewMeasurements as $view => $measurements) {
             $h .= '<h3>' . e($viewLabels[$view] ?? $view) . '</h3><table>';
-            $h .= '<tr><th style="width:12%">Code</th><th>Parameter</th><th style="width:15%">Value</th><th>Alignment Status</th><th>Position Note</th></tr>';
-            if ($measurements->isEmpty()) {
-                $h .= '<tr><td colspan="5">No measurements</td></tr>';
+            $h .= '<tr>'
+                . '<th style="width:10%">Code</th>'
+                . '<th>Parameter</th>'
+                . '<th style="width:13%">Deviation</th>'
+                . '<th style="width:13%">Measured</th>'
+                . '<th style="width:16%">Reference</th>'
+                . '<th style="width:15%">Status</th>'
+                . '<th>Note</th>'
+                . '</tr>';
+            if (empty($measurements)) {
+                $h .= '<tr><td colspan="7">No measurements captured for this view.</td></tr>';
             } else {
                 foreach ($measurements as $m) {
-                    $label = $m->label;
-                    if (!$label) {
-                        $def = config('sparisk.measurements.' . $m->section);
-                        $label = $def['label'] ?? $m->section;
+                    $section = (string) ($m['section'] ?? '');
+                    $label = (string) ($m['label'] ?? '');
+                    if ($label === '') {
+                        $def = config('sparisk.measurements.' . $section);
+                        $label = $def['label'] ?? $section;
                     }
-                    $status = $m->review_required ? 'review' : ($m->alignment_status ?? $m->severity ?? 'normal');
-                    $meta = config("sparisk.alignment_statuses.{$status}", config('sparisk.alignment_statuses.normal'));
-                    $col = $this->alignmentHex($meta['color']);
-                    $note = $m->review_required
-                        ? config('sparisk.alignment_status_descriptions.review')
-                        : ($m->position_note ?? '');
+                    $statusCode = (string) ($m['status_code'] ?? 'review');
+                    $statusMeta = $outputStatuses[$statusCode] ?? $outputStatuses['review'];
+                    $col = $this->alignmentHex($statusMeta['color'] ?? 'grey');
+                    $statusLabel = $statusMeta['label'] ?? $statusCode;
 
-                    $h .= '<tr><td>' . e($m->section) . '</td><td>' . e($label) . '</td>';
-                    $h .= '<td>' . e((string) number_format((float) $m->value, 1)) . '°</td>';
-                    $h .= '<td style="color:' . $col . '">' . e($meta['label']) . '</td>';
-                    $h .= '<td>' . e($note) . '</td></tr>';
+                    $deviation = $m['deviation_angle'] ?? null;
+                    $measured = $m['measured_angle'] ?? $m['value'] ?? null;
+                    $reference = $m['reference_value'] ?? null;
+                    $level = $m['reference_level'] ?? null;
+                    $levelLabel = $referenceLevels[$level]['label'] ?? null;
+
+                    $deviationStr = $deviation === null
+                        ? '—'
+                        : ($deviation > 0 ? '+' : '') . number_format((float) $deviation, 1) . '°';
+                    $measuredStr = $measured === null ? '—' : number_format((float) $measured, 1) . '°';
+                    if ($reference === null) {
+                        $referenceStr = $statusCode === 'baseline_tracking' ? 'Individual Baseline' : '—';
+                    } else {
+                        $referenceStr = number_format((float) $reference, 1) . '°';
+                        if ($levelLabel) {
+                            $referenceStr .= ' [' . $levelLabel . ']';
+                        }
+                    }
+
+                    $note = (string) ($m['position_note'] ?? $m['interpretation'] ?? '');
+
+                    $h .= '<tr>'
+                        . '<td>' . e($section) . '</td>'
+                        . '<td>' . e($label) . '</td>'
+                        . '<td style="color:' . $col . '"><strong>' . $deviationStr . '</strong></td>'
+                        . '<td>' . $measuredStr . '</td>'
+                        . '<td>' . e($referenceStr) . '</td>'
+                        . '<td style="color:' . $col . '"><strong>' . e($statusLabel) . '</strong></td>'
+                        . '<td>' . e($note) . '</td>'
+                        . '</tr>';
                 }
             }
             $h .= '</table>';
@@ -188,7 +233,8 @@ class AssessmentController extends Controller
                 $h .= '<li>Confidence: ' . e($classification['confidence_label'] ?? $classification['confidence_level']) . '</li>';
             }
             $h .= '</ul>';
-            $h .= '<p class="muted">The measurements currently available are not sufficient to confirm a posture type. No Swayback, Lordosis or Kyphosis diagnosis has been made.</p>';
+            $h .= '<p class="muted">' . e($classification['explanation']
+                ?? 'The measurements currently available are not sufficient to confirm a posture type. Measurement review is required.') . '</p>';
         } else {
             $h .= '<p><strong>' . e($classification['display']) . '</strong></p>';
         }

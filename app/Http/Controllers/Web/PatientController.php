@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Models\PostureAssessment;
+use App\Services\Sparisk\AquaticSkillsProgressService;
 use App\Services\Sparisk\SpariskBmiEngine;
 use App\Services\Sparisk\SpariskInterpretationEngine;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class PatientController extends Controller
     public function __construct(
         private SpariskInterpretationEngine $interpretationEngine,
         private SpariskBmiEngine $bmiEngine,
+        private AquaticSkillsProgressService $skillsProgress,
     ) {}
 
     public function index(Request $request)
@@ -120,6 +122,7 @@ class PatientController extends Controller
                 'updated_at' => $patient->updated_at,
                 'created_at' => $patient->created_at,
             ],
+            'skillsProgress' => $this->skillsProgress->forPatient($patient),
             ...$this->neuroOptions(),
         ]);
     }

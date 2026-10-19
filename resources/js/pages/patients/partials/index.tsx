@@ -4,3 +4,5 @@ export { default as PatientForm } from './form';
 export type { NeuroOption } from './form';
 export { usePatientForm, useBmiPreview } from './hooks';
 export type { Patient, PatientFormData, BmiResult } from './hooks';
+export { default as SkillsProgressDashboard } from './skills-progress';
+export type { SkillsProgress, SkillsSession, SkillsCategory } from './skills-progress';
