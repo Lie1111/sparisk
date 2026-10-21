@@ -43,13 +43,100 @@
         letter-spacing: 0.3px;
         padding-bottom: 4px;
         border-bottom: 2px solid #0E7C86;
-        margin: 16px 0 10px 0;
+        margin: 16px 0 6px 0;
     }
     .view-head .ltr { color: #0E7C86; }
     .view-head.first { margin-top: 0; }
 
     .muted { color: #64748B; }
     .pb { page-break-after: always; }
+
+    /* ---------- Report header card ---------- */
+    table.profile-card {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #D7E0E5;
+        background: #FFFFFF;
+    }
+    table.profile-card td { vertical-align: middle; padding: 12px 14px; }
+    table.profile-card td.profile-main { border-right: 1px solid #E4EBEE; }
+    .profile-name { font-size: 18px; font-weight: bold; line-height: 1.2; color: #0A3C50; }
+    .profile-meta { font-size: 9px; color: #475569; margin-top: 4px; }
+    .profile-note { font-size: 8.5px; color: #64748B; margin-top: 3px; }
+    table.profile-card td.profile-score {
+        width: 150pt;
+        text-align: center;
+        background: #F6F9FA;
+    }
+    .score-label {
+        font-size: 7px;
+        font-weight: bold;
+        color: #64748B;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+    }
+    .score-value { font-size: 30px; font-weight: bold; line-height: 32px; color: #0A3C50; }
+    .score-value .score-max { font-size: 11px; font-weight: normal; color: #64748B; }
+    .score-status {
+        display: inline-block;
+        margin-top: 4px;
+        padding: 3px 8px;
+        font-size: 7px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #FFFFFF;
+        border-radius: 8px;
+    }
+
+    /* ---------- Summary cards ---------- */
+    table.summary-cards { width: 100%; border-collapse: separate; border-spacing: 6px; }
+    table.summary-cards td {
+        width: 20%;
+        vertical-align: top;
+        border: 1px solid #D7E0E5;
+        border-top: 2px solid #0E7C86;
+        background: #FFFFFF;
+        padding: 7px 8px;
+    }
+    .summary-label {
+        display: block;
+        font-size: 7px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748B;
+        margin-bottom: 2px;
+    }
+    .summary-value {
+        display: block;
+        font-size: 9px;
+        font-weight: bold;
+        line-height: 1.3;
+        color: #0A3C50;
+    }
+
+    /* ---------- Reading guide ---------- */
+    table.legend { width: 100%; border-collapse: collapse; border: 1px solid #E4EBEE; background: #FFFFFF; }
+    table.legend td { width: 50%; vertical-align: top; padding: 9px 11px; }
+    table.legend td + td { border-left: 1px solid #E4EBEE; }
+    .legend-title {
+        font-size: 8px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #0A3C50;
+        margin-bottom: 5px;
+    }
+    .legend-item { font-size: 8.5px; line-height: 1.45; color: #475569; margin: 0 0 3px 0; }
+    .legend-swatch {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 2px;
+        margin-right: 5px;
+        vertical-align: -1px;
+    }
 
     /* ---------- Patient / detail fields ----------
        Each cell stacks a small uppercase label over its value, so the page
@@ -94,6 +181,8 @@
         border: 1px solid #D7E0E5;
     }
     table.data th.c-sec { background: #DCE9EC; }
+    table.data thead { display: table-header-group; }
+    table.data tr { page-break-inside: avoid; }
     table.data td {
         font-size: 9.5px;
         padding: 5px 8px;
@@ -115,33 +204,85 @@
        right margin. The photo is sized by height (dompdf scales the width
        proportionally) and the overlay box the service computes is capped to
        the content width, so a plate always fits inside one A4 content box. */
-    .photo-block { text-align: center; margin-bottom: 10px; }
-    .plain-photo { height: 360pt; max-width: 100%; border: 1px solid #E4EBEE; }
-
-    /* ---------- Anatomical labels on a posture photo ----------
-       A label gutter sits to the left of the photo; the photo, the labels and
-       the dashed leader lines pointing at each body region are all absolutely
-       positioned inside one box whose size the service computes in points. */
-    .cm-box { position: relative; display: inline-block; text-align: left; }
-    .cm-img { position: absolute; top: 0; left: 0; display: block; border: 1px solid #E4EBEE; }
-    .cm-label {
-        position: absolute;
-        left: 0;
-        width: 58pt;
-        text-align: right;
-        font-size: 11px;
-        font-weight: bold;
-        line-height: 1;
-        white-space: nowrap;
-        color: #0A3C50;
+    .photo-block {
+        text-align: center;
+        margin-bottom: 12px;
+        padding: 8px 0 4px 0;
+        background: #F8FAFB;
+        border: 1px solid #E4EBEE;
+    }
+    .plain-photo { height: 360pt; max-width: 100%; border: 1px solid #D7E0E5; }
+    .plate-meta {
+        margin: 0 0 8px 0;
+        font-size: 8px;
+        color: #64748B;
         letter-spacing: 0.2px;
     }
+
+    /* ---------- Photo and measurement table side by side ----------
+       Mirrors the reference plate: the annotated photo fills the left column
+       and the measurement table the right. Two plates share a page, so the
+       report keeps the reference's compact, paired reading order. */
+    .plate-section { margin-bottom: 18pt; page-break-inside: avoid; }
+    table.plate { width: 100%; border-collapse: collapse; }
+    table.plate td.plate-photo {
+        width: 60%;
+        vertical-align: top;
+        padding-right: 10pt;
+    }
+    table.plate td.plate-table { width: 40%; vertical-align: top; }
+    table.plate .photo-block {
+        margin-bottom: 0;
+        padding: 4px 0;
+    }
+    table.plate .plain-photo { height: auto; max-height: 300pt; max-width: 100%; }
+    .plate-note {
+        margin: 6px 0 0 0;
+        font-size: 7px;
+        line-height: 1.4;
+        color: #64748B;
+    }
+    table.data.compact th { font-size: 6.5px; padding: 4px 4px; }
+    table.data.compact td { font-size: 8px; padding: 3px 4px; line-height: 1.3; }
+    table.data.compact .c-code { width: 15%; }
+    table.data.compact .c-sec { width: 43%; }
+    table.data.compact .c-dev { width: 21%; }
+    table.data.compact .c-corr { width: 21%; }
+
+    /* ---------- Labels beside a posture photo ----------
+       A photo is framed by two gutters of equal width: level names and their
+       table codes read from the left, the stored deviations from the right.
+       Every element is absolutely positioned inside one box whose size the
+       service computes in points, so the labels can never drift onto the body
+       or past the page margin. */
+    .cm-box { position: relative; display: inline-block; text-align: left; }
+    .cm-img { position: absolute; top: 0; left: 0; display: block; border: 1px solid #D7E0E5; }
+    .cm-label {
+        position: absolute;
+        width: 52pt;
+        font-size: 9px;
+        font-weight: bold;
+        line-height: 1.15;
+        white-space: normal;
+        color: #0A3C50;
+        letter-spacing: 0.1px;
+    }
+    .cm-label-left { text-align: right; }
+    .cm-label-right { text-align: left; }
+    .cm-name { display: inline; }
+    .cm-deg { display: block; margin-top: 1pt; font-size: 8px; font-weight: bold; color: #1D4ED8; }
     /* The measurement row code (A3, C4…) that the line ranks with, printed
-       small and in the accent colour on the line above the body part, so a
-       long name never wraps into the leader line. */
-    .cm-code { display: block; font-size: 8px; color: #0E7C86; letter-spacing: 0.3px; }
-    .cm-leader { position: absolute; height: 0; border-top: 2px dashed #0E7C86; }
-    .cm-dot { position: absolute; width: 6px; height: 6px; border-radius: 3px; background: #0E7C86; }
+       small and in the accent colour above the body part. */
+    .cm-code {
+        display: block;
+        margin-bottom: 1pt;
+        font-size: 7px;
+        font-weight: bold;
+        color: #0E7C86;
+        letter-spacing: 0.3px;
+    }
+    .cm-leader { position: absolute; height: 0; border-top: 1px dashed #0E7C86; transform-origin: 0 0; }
+    .cm-dot { position: absolute; width: 5px; height: 5px; border-radius: 2.5px; background: #0E7C86; }
 
     /* ---------- APECS pose overlay ----------
        Drawn on top of the photo as plain CSS borders so dompdf emits real
@@ -155,17 +296,6 @@
     .ov-seg { position: absolute; height: 0; border-top: 2px solid #2563EB; transform-origin: 0 0; }
     .ov-level { position: absolute; height: 0; border-top: 2px solid #F59E0B; transform-origin: 0 0; }
     .ov-mk { position: absolute; box-sizing: border-box; width: 6pt; height: 6pt; border-radius: 3pt; background: #FFFFFF; border: 1px solid #2563EB; }
-    .ov-deg {
-        position: absolute;
-        font-size: 7px;
-        font-weight: bold;
-        line-height: 9px;
-        white-space: nowrap;
-        color: #1D4ED8;
-        background: #FFFFFF;
-        border: 1px solid #2563EB;
-        padding: 0 2px;
-    }
     .ov-align-tag {
         position: absolute;
         font-size: 7.5px;
@@ -198,6 +328,7 @@
 
     /* ---------- Exercise cards ---------- */
     table.ex-grid { width: 100%; border-collapse: separate; border-spacing: 8px; }
+    table.ex-grid tr { page-break-inside: avoid; }
     table.ex-grid td.ex-card {
         width: 50%;
         vertical-align: top;
@@ -227,6 +358,7 @@
     .ex-note { font-size: 8.5px; color: #475569; }
 
     .comment { font-size: 9.5px; font-weight: bold; color: #0A3C50; margin: 10px 0 5px 0; }
+    .comment-body { font-size: 9px; color: #475569; margin: 0 0 10px 0; }
 
     /* ---------- Student progress dashboard ----------
        Dompdf has no canvas, flexbox or transforms, so every chart below is a
@@ -271,24 +403,40 @@
 
 {{-- ============================ PAGE 1 ============================ --}}
 <div class="band first">Patient Details</div>
-<table class="fields">
+<table class="profile-card">
     <tr>
-        <td><span class="pl">Sex:</span> <span class="pv">{{ $patient['gender'] }}</span></td>
-        <td><span class="pl">Age:</span> <span class="pv">{{ $patient['age'] }}</span></td>
-        <td><span class="pl">Name:</span> <span class="pv">{{ $patient['name'] }}</span></td>
+        <td class="profile-main">
+            <div class="profile-name">{{ $patient['name'] }}</div>
+            <div class="profile-meta">
+                {{ $patient['gender'] }} · {{ $patient['age'] }} · {{ $patient['height'] }} · {{ $patient['weight'] }}
+                @if ($bmi)<span class="muted">· BMI {{ $bmi['value'] }} ({{ $bmi['category'] }})</span>@endif
+            </div>
+            <div class="profile-note">
+                Diagnosis: {{ $patient['diagnosis'] }} &nbsp;·&nbsp; Neuro profile: {{ $patient['neuro_profile'] }}
+            </div>
+        </td>
+        <td class="profile-score">
+            <div class="score-label">Overall score</div>
+            <div class="score-value">{{ $assessment['score'] }}<span class="score-max"> / 100</span></div>
+            <div class="score-status" style="background: {{ $assessment['status_color'] }}">{{ $assessment['status'] ?: 'Assessed' }}</div>
+        </td>
     </tr>
+</table>
+
+<table class="fields" style="margin-top: 12px">
     <tr>
-        <td><span class="pl">Height:</span> <span class="pv">{{ $patient['height'] }}</span></td>
-        <td><span class="pl">Weight:</span> <span class="pv">{{ $patient['weight'] }}</span></td>
-        <td><span class="pl">BMI:</span> <span class="pv">{{ $bmi ? $bmi['value'].' · '.$bmi['category'] : '-' }}</span></td>
-    </tr>
-    <tr>
-        <td colspan="2"><span class="pl">Diagnosis:</span> <span class="pv">{{ $patient['diagnosis'] }}</span></td>
-        <td><span class="pl">Neuro Profile:</span> <span class="pv">{{ $patient['neuro_profile'] }}</span></td>
-    </tr>
-    <tr>
-        <td colspan="2"><span class="pl">Overall Score:</span> <span class="pv">{{ $assessment['score'] }} / 100 · {{ $assessment['status'] ?: 'Assessed' }}</span></td>
-        <td><span class="pl">Classification:</span> <span class="pv">{{ $classification['display'] }}</span></td>
+        <td>
+            <span class="pl">Assessment Date:</span>
+            <span class="pv">{{ $assessment['date'] }}{{ $assessment['time_mark'] ? ' · '.$assessment['time_mark'] : '' }}</span>
+        </td>
+        <td>
+            <span class="pl">Captured Views:</span>
+            <span class="pv">{{ $assessment['captured_views'] }} of 4</span>
+        </td>
+        <td>
+            <span class="pl">Measured Markers:</span>
+            <span class="pv">{{ $assessment['marker_count'] }}</span>
+        </td>
     </tr>
 </table>
 
@@ -300,6 +448,57 @@
         <p class="muted">No overview available for this assessment.</p>
     @endforelse
 </div>
+
+<div class="band">Classification Summary</div>
+@if ($classification['review_required'] && $classification['explanation'])
+    <p class="muted" style="margin: 0 0 6px 0">{{ $classification['explanation'] }}</p>
+@endif
+<table class="summary-cards">
+    <tr>
+        <td>
+            <span class="summary-label">Result</span>
+            <span class="summary-value">{{ $classification['display'] }}</span>
+        </td>
+        <td>
+            <span class="summary-label">Main Finding</span>
+            <span class="summary-value">{{ $classification['suspected_pattern_label'] ?: '-' }}</span>
+        </td>
+        <td>
+            <span class="summary-label">Secondary</span>
+            <span class="summary-value">{{ $classification['secondary_pattern_label'] ?: '-' }}</span>
+        </td>
+        <td>
+            <span class="summary-label">Asymmetry</span>
+            <span class="summary-value">{{ $classification['asymmetry_flag'] ? 'Detected' : 'Not detected' }}</span>
+        </td>
+        <td>
+            <span class="summary-label">Confidence</span>
+            <span class="summary-value">{{ $classification['confidence_label'] ?: '-' }}</span>
+        </td>
+    </tr>
+</table>
+
+<div class="band">Reading This Report</div>
+<table class="legend">
+    <tr>
+        <td>
+            <div class="legend-title">Photo overlay</div>
+            <p class="legend-item"><span class="legend-swatch" style="background: #2ECC40"></span><strong>Green</strong> — vertical plumb line used as the reference.</p>
+            <p class="legend-item"><span class="legend-swatch" style="background: #E74C3C"></span><strong>Red</strong> — body alignment line; its stored deviation is quoted in the tag.</p>
+            <p class="legend-item"><span class="legend-swatch" style="background: #F59E0B"></span><strong>Orange</strong> — one measured level per row.</p>
+            <p class="legend-item"><span class="legend-swatch" style="background: #2563EB"></span><strong>Blue</strong> — bone segments and landmark markers.</p>
+            <p class="legend-item">Each label shows its row code and level name in the left gutter, with the stored deviation in the right gutter; a side profile keeps both in one gutter.</p>
+        </td>
+        <td>
+            <div class="legend-title">Status bands</div>
+            <p class="legend-item"><strong style="color: #16A34A">On Point</strong> — within the approved SATA reference band.</p>
+            <p class="legend-item"><strong style="color: #CA8A04">Near Point</strong> — mild deviation, still close to the reference.</p>
+            <p class="legend-item"><strong style="color: #EA580C">Off Point</strong> — moderate or severe deviation from the reference.</p>
+            <p class="legend-item"><strong style="color: #2563EB">Baseline / Change Tracking</strong> — no approved population reference; the row is tracked against the patient's own first assessment.</p>
+            <p class="legend-item">Measurements are screening indicators and do not replace a medical diagnosis.</p>
+        </td>
+    </tr>
+</table>
 
 {{-- ==================== STUDENT PROGRESS DASHBOARD ==================== --}}
 {{-- One dashboard per patient, not per assessment: the report shows every
@@ -388,105 +587,64 @@
     </div>
 @endif
 
-{{-- ==================== A. FRONT / B. BACK ==================== --}}
-{{-- Each view gets its own page. The labelled photo sits full width at the top
-     and its measurement table spans the whole content width underneath, so
-     neither the overlay box nor the table can run past the right margin. --}}
+{{-- ==================== VIEW PLATES ==================== --}}
+{{-- Two views per page, following the reference report: the annotated photo
+     with its gutter labels on the left, the measurement table beside it on the
+     right. The photo geometry is computed by the service, so every plate is
+     the same width and no label can run onto the body. --}}
 <div class="pb"></div>
-@foreach (['front', 'back'] as $key)
-    <div class="view-head first"><span class="ltr">{{ $views[$key]['letter'] }}.</span> {{ $views[$key]['name'] }}</div>
-    @isset ($images[$key])
-        <div class="photo-block">
-            @if (empty($images[$key]['levels']))
-                <img class="plain-photo" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-            @else
-                <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
-                    <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-                    @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => true])
-                    @foreach ($images[$key]['levels'] as $level)
-                        <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
-                        <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
-                        <div class="cm-dot" style="left: {{ $level['dot_left'] }}pt; top: {{ $level['dot_top'] }}pt"></div>
-                    @endforeach
-                </div>
-            @endif
-        </div>
-    @endisset
-    <table class="data">
-        <thead>
-            <tr>
-                <th class="c-code">Marker</th>
-                <th class="c-sec">Parameter</th>
-                <th class="c-meas">Measured</th>
-                <th class="c-ref">Reference</th>
-                <th class="c-dev">Deviation</th>
-                <th class="c-corr">Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($views[$key]['rows'] as $row)
+@php
+    $plateGroups = [['front', 'back'], ['right_side', 'left_side']];
+@endphp
+@foreach ($plateGroups as $group)
+    @foreach ($group as $key)
+        @php
+            $view = $views[$key];
+            $image = $images[$key] ?? null;
+            $upright = in_array($key, ['front', 'back'], true);
+            $summary = $view['summary'];
+            $statusParts = [];
+            if ($summary['on_point']) {
+                $statusParts[] = $summary['on_point'].' on point';
+            }
+            if ($summary['near_point']) {
+                $statusParts[] = $summary['near_point'].' near point';
+            }
+            if ($summary['off_point']) {
+                $statusParts[] = $summary['off_point'].' off point';
+            }
+            if ($summary['baseline']) {
+                $statusParts[] = $summary['baseline'].' baseline';
+            }
+            if ($summary['review']) {
+                $statusParts[] = $summary['review'].' to review';
+            }
+        @endphp
+        <div class="plate-section">
+            <div class="view-head {{ $loop->first ? 'first' : '' }}"><span class="ltr">{{ $view['letter'] }}.</span> {{ $view['name'] }}</div>
+            <p class="plate-meta">
+                {{ $summary['total'] }} marker{{ $summary['total'] === 1 ? '' : 's' }} measured
+                @if (count($statusParts))
+                    · {{ implode(' · ', $statusParts) }}
+                @endif
+            </p>
+            <table class="plate">
                 <tr>
-                    <td>{{ $row['code'] !== '' ? $row['code'] : '—' }}</td>
-                    <td>{{ $row['name'] }}</td>
-                    <td class="c-meas">{{ $row['measured'] }}°</td>
-                    <td class="c-ref">{{ $row['reference'] !== null ? $row['reference'].'°' : 'Baseline' }}@if ($row['tolerance'] !== null) <span class="muted">±{{ $row['tolerance'] }}°</span>@endif</td>
-                    <td class="c-dev val" style="color: {{ $row['color'] }}">{{ $row['deviation'] !== null ? $row['deviation'].'°' : '—' }}</td>
-                    <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
+                    <td class="plate-photo">
+                        @include('pdf.partials.posture-plate', ['image' => $image, 'upright' => $upright])
+                    </td>
+                    <td class="plate-table">
+                        @include('pdf.partials.posture-table', ['view' => $view])
+                    </td>
                 </tr>
-            @empty
-                <tr><td colspan="6" class="muted">No measurements captured for this view.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
-    <div class="pb"></div>
-@endforeach
-
-{{-- ==================== C. RIGHT SIDE / D. LEFT SIDE ==================== --}}
-{{-- Same stacked plate as the front/back views: one side per page, photo on
-     top, measurement table full width underneath. --}}
-@foreach (['right_side', 'left_side'] as $key)
-    <div class="view-head first"><span class="ltr">{{ $views[$key]['letter'] }}.</span> {{ $views[$key]['name'] }}</div>
-    @isset ($images[$key])
-        <div class="photo-block">
-            @if (empty($images[$key]['levels']))
-                <img class="plain-photo" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-            @else
-                <div class="cm-box" style="width: {{ $images[$key]['box_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt">
-                    <img class="cm-img" style="left: {{ $images[$key]['img_left'] }}pt; width: {{ $images[$key]['img_w'] }}pt; height: {{ $images[$key]['box_h'] }}pt" src="{{ $images[$key]['data'] }}" alt="{{ $images[$key]['label'] }}">
-                    @include('pdf.partials.posture-overlay', ['photo' => $images[$key], 'upright' => false])
-                    @foreach ($images[$key]['levels'] as $level)
-                        <div class="cm-label" style="left: {{ $level['label_left'] }}pt; top: {{ round($level['y'] - ($level['code'] !== '' ? 7 : 4), 1) }}pt; text-align: {{ $level['label_align'] }}">@if ($level['code'] !== '')<span class="cm-code">{{ $level['code'] }}</span>@endif{{ $level['label'] }}</div>
-                        <div class="cm-leader" style="left: {{ $level['x1'] }}pt; top: {{ $level['y'] }}pt; width: {{ round($level['x2'] - $level['x1'], 1) }}pt"></div>
-                        <div class="cm-dot" style="left: {{ $level['dot_left'] }}pt; top: {{ $level['dot_top'] }}pt"></div>
-                    @endforeach
-                </div>
-            @endif
+            </table>
         </div>
-    @endisset
-    <table class="data">
-        <thead>
-            <tr>
-                <th class="c-code">Marker</th>
-                <th class="c-sec">Parameter</th>
-                <th class="c-dev">Deviation</th>
-                <th class="c-corr">Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            @forelse ($views[$key]['rows'] as $row)
-                <tr>
-                    <td>{{ $row['code'] !== '' ? $row['code'] : '—' }}</td>
-                    <td>{{ $row['name'] }}</td>
-                    <td class="c-dev val" style="color: {{ $row['color'] }}">{{ $row['deviation'] !== null ? $row['deviation'].'°' : '—' }}</td>
-                    <td style="color: {{ $row['color'] }}">{{ $row['correction'] }}</td>
-                </tr>
-            @empty
-                <tr><td colspan="4" class="muted">No measurements.</td></tr>
-            @endforelse
-        </tbody>
-    </table>
-    <div class="pb"></div>
+    @endforeach
+    @if (! $loop->last)
+        <div class="pb"></div>
+    @endif
 @endforeach
+<div class="pb"></div>
 
 {{-- ============ DETAILED ANGLE BREAKDOWN (admin panel only) ============ --}}
 {{-- Requested only by the web admin (SpariskReportPdfService::download(…, true)).
@@ -569,32 +727,10 @@
 --}}
 
 {{-- ==================== CLASSIFICATION & FINDINGS ==================== --}}
-<div class="band first">Posture Classification</div>
-@if ($classification['review_required'])
-    <p class="muted" style="margin: 0 0 6px 0">
-        {{ $classification['explanation'] ?: 'The measurements currently available are not sufficient to suggest a posture pattern. Measurement review is required.' }}
-    </p>
-@endif
-<table class="fields">
-    <tr>
-        <td><span class="pl">Result:</span> <span class="pv">{{ $classification['display'] }}</span></td>
-    </tr>
-    <tr>
-        <td><span class="pl">Main Finding:</span> <span class="pv">{{ $classification['suspected_pattern_label'] ?: '-' }}</span></td>
-    </tr>
-    <tr>
-        <td><span class="pl">Secondary:</span> <span class="pv">{{ $classification['secondary_pattern_label'] ?: '-' }}</span></td>
-    </tr>
-    <tr>
-        <td><span class="pl">Asymmetry:</span> <span class="pv">{{ $classification['asymmetry_flag'] ? 'Detected' : 'Not detected' }}</span></td>
-    </tr>
-    <tr>
-        <td><span class="pl">Confidence:</span> <span class="pv">{{ $classification['confidence_label'] ?: '-' }}</span></td>
-    </tr>
-</table>
-
+{{-- The result and its pattern are summarised on page one; this page carries
+     the supporting detail, the primary findings and the symmetry check. --}}
 @if (count($classification['classifications']))
-    <div class="band">Classification Detail</div>
+    <div class="band first">Classification Detail</div>
     <table class="data">
         <thead>
             <tr><th>Classification</th><th class="c-sec">Type</th><th class="c-sec">Alignment</th></tr>
@@ -618,8 +754,12 @@
     </table>
 @endif
 
+@php
+    $detailFirst = count($classification['classifications']) === 0;
+@endphp
+
 @if (count($findings))
-    <div class="band">Primary Findings</div>
+    <div class="band {{ $detailFirst ? 'first' : '' }}">Primary Findings</div>
     <table class="data">
         <thead>
             <tr><th>Finding</th><th class="c-sec">Note</th><th class="c-val">Value</th><th class="c-sec">Alignment</th></tr>
@@ -638,7 +778,7 @@
 @endif
 
 @if (count($symmetry))
-    <div class="band">Left / Right Symmetry</div>
+    <div class="band {{ $detailFirst && count($findings) === 0 ? 'first' : '' }}">Left / Right Symmetry</div>
     <table class="data">
         <thead>
             <tr><th>Pair</th><th class="c-val">Left</th><th class="c-val">Right</th><th class="c-sec">Status</th></tr>
@@ -698,14 +838,22 @@
     </table>
 @endif
 
-{{-- ==================== SELECTED EXERCISES (last page) ==================== --}}
-<div class="pb"></div>
+{{-- ==================== SELECTED EXERCISES ==================== --}}
+{{-- Follows the therapy plan on the same page when there is room, so the
+     report does not end with a mostly empty sheet. --}}
+@php
+    $hasPlans = count($massages) > 0 || count($weekly) > 0;
+@endphp
 
-<div class="band first">Selected Exercises</div>
+<div class="band {{ $hasPlans ? '' : 'first' }}">Selected Exercises</div>
 <p class="muted" style="margin: 0 0 4px 0">
     Exercises selected for this assessment. Use the SPARISK app to track sets, reps and progress.
 </p>
-<div class="comment">Comment:</div>
+
+@if (! empty($assessment['clinical_summary']))
+    <div class="comment">Clinical Comment</div>
+    <p class="comment-body">{{ $assessment['clinical_summary'] }}</p>
+@endif
 
 @if (count($exercises))
     <table class="ex-grid">

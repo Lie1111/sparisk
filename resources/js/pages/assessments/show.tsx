@@ -179,7 +179,7 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                         <TabsTrigger value="exercises"><Dumbbell className="mr-2 h-4 w-4" />Exercises</TabsTrigger>
                         <TabsTrigger value="massage"><Star className="mr-2 h-4 w-4" />Massage</TabsTrigger>
                         <TabsTrigger value="program"><CalendarDays className="mr-2 h-4 w-4" />Weekly Program</TabsTrigger>
-                        <TabsTrigger value="capture"><Camera className="mr-2 h-4 w-4" />Capture</TabsTrigger>
+                        {/* <TabsTrigger value="capture"><Camera className="mr-2 h-4 w-4" />Capture</TabsTrigger> */}
                     </TabsList>
 
                     <TabsContent value="measurements" className="mt-4">

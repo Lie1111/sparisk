@@ -34,6 +34,7 @@ class SpariskReportPdfService
         'yellow' => '#CA8A04',
         'orange' => '#EA580C',
         'red' => '#DC2626',
+        'blue' => '#2563EB',
         'grey' => '#64748B',
     ];
 
@@ -54,13 +55,24 @@ class SpariskReportPdfService
     /** Display height of a posture photo and the label gutter beside it (pt). */
     private const PHOTO_HEIGHT = 360.0;
 
-    private const PHOTO_GUTTER = 62.0;
+    /**
+     * The photo plate now sits beside its measurement table, so the photo box
+     * gets the left column of the content width; the table takes the right.
+     */
+    private const PLATE_PHOTO_WIDTH = 300.0;
+
+    /**
+     * The two gutters beside a photo hold the level names (left) and their
+     * deviations (right). They are sized for the longest label the plates
+     * print ("Top of the curve"), so a name never spills onto the body.
+     */
+    private const PHOTO_GUTTER = 58.0;
 
     /** Usable width inside the A4 page margins (595.28 - 38 - 38 pt). */
     private const CONTENT_WIDTH = 519.0;
 
     /** Label width, the gap before a leader line, and the dot that ends it (pt). */
-    private const LABEL_WIDTH = 58.0;
+    private const LABEL_WIDTH = 52.0;
 
     private const LEADER_GAP = 1.0;
 
@@ -143,7 +155,9 @@ class SpariskReportPdfService
         'front' => [
             ['Head', 'l_ear', 'r_ear'],
             ['Acrom.', 'l_shoulder', 'r_shoulder'],
+            ['Axill.', '@0.10', '@0.10'],
             ['Ribc.', '@0.30', '@0.30'],
+            ['Torso', '@0.50', '@0.50'],
             ['ASIS', 'l_hip', 'r_hip'],
             ['Knees', 'l_knee', 'r_knee'],
             ['Feet', 'l_ankle', 'r_ankle'],
@@ -214,10 +228,33 @@ class SpariskReportPdfService
      * both sides of a paired row.
      */
     private const HIGHLIGHT_CODES = [
-        'front' => ['Head' => 'A2', 'Shoulders' => 'A3', 'Core' => 'A6', 'Knees' => 'A8/A9', 'Feet' => 'A10/A11'],
-        'back' => ['Neck' => 'B2', 'Shoulders' => 'B3', 'Lower Back' => 'B6', 'Knees' => 'B7', 'Feet' => 'B8'],
-        'right_side' => ['Head' => 'C2', 'Chest' => 'C3', 'Hip' => 'C4', 'Thigh' => 'C5', 'Calf' => 'C6'],
-        'left_side' => ['Head' => 'D2', 'Chest' => 'D3', 'Hip' => 'D4', 'Thigh' => 'D5', 'Calf' => 'D6'],
+        'front' => [
+            'Alignment' => 'A1',
+            'Head' => 'A2',
+            'Shoulders' => 'A3',
+            'Acrom.' => 'A3',
+            'Axill.' => 'A4',
+            'Ribc.' => 'A5',
+            'Core' => 'A6',
+            'Torso' => 'A6',
+            'ASIS' => 'A7',
+            'Knees' => 'A8/A9',
+            'Feet' => 'A10/A11',
+        ],
+        'back' => [
+            'Alignment' => 'B1',
+            'Neck' => 'B2',
+            'Ears' => 'B2',
+            'Shoulders' => 'B3',
+            'Axillae' => 'B4',
+            'Top of the curve' => 'B5',
+            'Lower Back' => 'B6',
+            'PSIS' => 'B6',
+            'Knees' => 'B7',
+            'Feet' => 'B8',
+        ],
+        'right_side' => ['Alignment' => 'C1', 'Head' => 'C2', 'Chest' => 'C3', 'Shoulder' => 'C3', 'Hip' => 'C4', 'Pelvis' => 'C4', 'Thigh' => 'C5', 'Femur' => 'C5', 'Calf' => 'C6', 'Tibia' => 'C6', 'Foot' => 'C7'],
+        'left_side' => ['Alignment' => 'D1', 'Head' => 'D2', 'Chest' => 'D3', 'Shoulder' => 'D3', 'Hip' => 'D4', 'Pelvis' => 'D4', 'Thigh' => 'D5', 'Femur' => 'D5', 'Calf' => 'D6', 'Tibia' => 'D6', 'Foot' => 'D7'],
     ];
 
     /**
@@ -243,7 +280,9 @@ class SpariskReportPdfService
         'front' => [
             'Head' => ['A2'],
             'Acrom.' => ['A3'],
+            'Axill.' => ['A4'],
             'Ribc.' => ['A5'],
+            'Torso' => ['A6'],
             'ASIS' => ['A7'],
             'Knees' => ['A8', 'A9'],
             'Feet' => ['A10', 'A11'],
@@ -444,6 +483,8 @@ class SpariskReportPdfService
         ]);
 
         $statuses = config('sparisk.alignment_statuses');
+        $views = $this->viewData($assessment, $statuses);
+        $images = $this->imageData($assessment);
 
         return [
             'extended' => $extended,
@@ -455,11 +496,17 @@ class SpariskReportPdfService
                 'time_mark' => $assessment->time_mark,
                 'score' => (int) $assessment->overall_score,
                 'status' => $assessment->overall_status,
+                'status_color' => $this->overallStatusColor((string) $assessment->overall_status),
                 'clinical_summary' => $assessment->clinical_summary,
+                'captured_views' => count($images),
+                'marker_count' => array_sum(array_map(
+                    fn (array $view) => count($view['rows']),
+                    $views,
+                )),
             ],
             'overview' => $this->overviewSentences($assessment),
-            'views' => $this->viewData($assessment, $statuses),
-            'images' => $this->imageData($assessment),
+            'views' => $views,
+            'images' => $images,
             'classification' => $this->interpreter->classificationSummary($assessment),
             'symmetry' => $this->interpreter->generateSymmetry($assessment),
             'findings' => $this->primaryFindings($assessment, $statuses),
@@ -468,6 +515,29 @@ class SpariskReportPdfService
             'weekly' => $assessment->weeklyPrograms,
             'skills' => $this->skillsData($assessment),
         ];
+    }
+
+    /**
+     * The colour the overall score is printed in, so the summary card on page
+     * one reads at a glance instead of asking the reader to interpret a label.
+     */
+    private function overallStatusColor(string $status): string
+    {
+        $status = strtoupper($status);
+
+        if (str_contains($status, 'GOOD') || str_contains($status, 'EXCELLENT') || str_contains($status, 'NORMAL')) {
+            return self::STATUS_HEX['green'];
+        }
+
+        if (str_contains($status, 'FAIR') || str_contains($status, 'MODERATE')) {
+            return self::STATUS_HEX['orange'];
+        }
+
+        if (str_contains($status, 'MILD')) {
+            return self::STATUS_HEX['yellow'];
+        }
+
+        return self::STATUS_HEX['red'];
     }
 
     /**
@@ -776,6 +846,10 @@ class SpariskReportPdfService
                         'code' => $code,
                         'section' => (string) $m->section,
                         'name' => $name,
+                        // The compact table beside the photo has no room for
+                        // the "Photo label ( measurement )" wording; the short
+                        // measurement label reads cleanly in one column.
+                        'short_name' => $label,
                         'measured' => $this->formatDecimal($m->measured_angle ?? $m->value),
                         'reference' => $reference !== null ? $this->formatDecimal($reference) : null,
                         // The published half-width the On Point / Near Point /
@@ -786,6 +860,7 @@ class SpariskReportPdfService
                         'reference_level' => $levelMeta['label'] ?? null,
                         'is_baseline' => $m->reference_level === 'individual_baseline',
                         'status' => $outputMeta['label'],
+                        'status_code' => $statusCode,
                         'correction' => $outputMeta['correction'] ?? $outputMeta['label'],
                         'color' => self::STATUS_HEX[$outputMeta['color']] ?? self::STATUS_HEX['grey'],
                         'note' => $m->position_note ?: $m->status_text,
@@ -793,10 +868,32 @@ class SpariskReportPdfService
                 })
                 ->all();
 
+            $summary = [
+                'total' => count($rows),
+                'on_point' => 0,
+                'near_point' => 0,
+                'off_point' => 0,
+                'baseline' => 0,
+                'review' => 0,
+            ];
+
+            foreach ($rows as $row) {
+                $bucket = match ($row['status_code']) {
+                    'on_point' => 'on_point',
+                    'near_point' => 'near_point',
+                    'off_point' => 'off_point',
+                    'baseline_tracking' => 'baseline',
+                    default => 'review',
+                };
+
+                $summary[$bucket]++;
+            }
+
             $views[$key] = [
                 'letter' => $meta['letter'],
                 'name' => $meta['name'],
                 'rows' => $rows,
+                'summary' => $summary,
             ];
         }
 
@@ -821,7 +918,7 @@ class SpariskReportPdfService
             }
 
             $mime = str_ends_with(strtolower($image->image_path), '.png') ? 'image/png' : 'image/jpeg';
-            $photo = $this->photoOverlay($image, $key);
+            $photo = $this->photoOverlay($image, $key, self::PLATE_PHOTO_WIDTH);
 
             $images[$key] = [
                 'label' => $names[$key],
@@ -960,25 +1057,24 @@ class SpariskReportPdfService
                 : compact('left', 'right', 'top', 'bottom');
         }
 
-        // Which gutter a label reads from decides how many gutters the box
-        // needs, so every side is resolved before the photo is sized.
+        // Both gutters are always reserved: names read from the left, values
+        // from the right, so every plate on the report is centred and the
+        // reader learns one reading order. A one-sided box would also shift the
+        // photo off the page centre by half a gutter on every other page.
         $sides = [];
-        $hasRight = false;
 
         foreach ($zones as $label => $zone) {
             // A region sitting a little past the midline of the photo belongs
             // to the right gutter; anything on or before it reads from the
             // left, so the paired front/back zones stay together.
-            $right = ($zone['left'] + $zone['right']) / 2 - 0.5 > 0.03;
-            $sides[$label] = $right;
-            $hasRight = $hasRight || $right;
+            $sides[$label] = ($zone['left'] + $zone['right']) / 2 - 0.5 > 0.03;
         }
 
-        // The box — the photo plus its label gutters — has to fit the column
-        // the caller allows, so the photo is scaled down from its display
-        // height until the whole overlay fits that width. Scaling both sides
-        // together keeps the labels aligned with the body.
-        $maxImageWidth = round($maxWidth - $gutter - ($hasRight ? $gutter : 0), 1);
+        // The box — the photo plus its two label gutters — has to fit the
+        // column the caller allows, so the photo is scaled down from its
+        // display height until the whole overlay fits that width. Scaling both
+        // sides together keeps the labels aligned with the body.
+        $maxImageWidth = round($maxWidth - ($gutter * 2), 1);
 
         if ($maxImageWidth > 0 && $width > $maxImageWidth) {
             $width = $maxImageWidth;
@@ -1002,7 +1098,7 @@ class SpariskReportPdfService
         // reading order follows the body.
         usort($rows, fn ($a, $b) => $a['y'] <=> $b['y']);
 
-        $boxW = round($gutter + $width + ($hasRight ? $gutter : 0), 1);
+        $boxW = round(($gutter * 2) + $width, 1);
         $dot = self::DOT_SIZE / 2;
 
         $levels = [];
@@ -1028,6 +1124,7 @@ class SpariskReportPdfService
             'box_h' => $height,
             'img_left' => $gutter,
             'img_w' => $width,
+            'label_width' => self::LABEL_WIDTH,
             'levels' => $levels,
         ];
     }
@@ -1104,6 +1201,7 @@ class SpariskReportPdfService
             'plumb' => ['left' => $plumbX],
             'align' => null,
             'levels' => [],
+            'labels' => [],
             'segments' => [],
             'markers' => [],
             'angle' => '',
@@ -1151,6 +1249,13 @@ class SpariskReportPdfService
                     'width' => round(abs($x - $plumbX), 1),
                     'angle' => 0.0,
                     'deg' => $this->levelDeviation($view, $label, $deviations),
+                    // The landmark is the point the label points at; the plumb
+                    // line is the other end of the level.
+                    'point' => [round($x, 1), $y],
+                    // The ankle is the plumb itself, so its own level has no
+                    // left/right direction; it reads from the right with the
+                    // rest of the profile labels.
+                    'side' => $x < $plumbX ? 'left' : 'right',
                 ];
 
                 $overlay['markers'][$label] = ['left' => round($x - (self::OV_MARKER / 2), 1), 'top' => round($y - (self::OV_MARKER / 2), 1)];
@@ -1173,6 +1278,8 @@ class SpariskReportPdfService
                     'width' => $line['width'],
                     'angle' => $line['angle'],
                     'deg' => $this->levelDeviation($view, $label, $deviations),
+                    'p1' => [round($px($pl[0]), 1), round($py($pl[1]), 1)],
+                    'p2' => [round($px($pr[0]), 1), round($py($pr[1]), 1)],
                 ];
 
                 $overlay['markers'][$label.'_l'] = ['left' => round($px($pl[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($pl[1]) - (self::OV_MARKER / 2), 1)];
@@ -1194,11 +1301,252 @@ class SpariskReportPdfService
             $overlay['markers'][$to] = ['left' => round($px($b[0]) - (self::OV_MARKER / 2), 1), 'top' => round($py($b[1]) - (self::OV_MARKER / 2), 1)];
         }
 
+        // A profile reads as one column: the landmarks sit on both sides of
+        // the plumb, so they are all printed from the gutter the majority of
+        // them face instead of alternating left/right down the body.
+        if ($side && $overlay['levels'] !== []) {
+            $leftFacing = count(array_filter(
+                $overlay['levels'],
+                fn (array $level) => ($level['side'] ?? 'right') === 'left',
+            ));
+            $sharedSide = ($leftFacing * 2) >= count($overlay['levels']) ? 'left' : 'right';
+
+            foreach ($overlay['levels'] as $index => $level) {
+                $overlay['levels'][$index]['side'] = $sharedSide;
+            }
+        }
+
         $overlay['markers'] = array_values($overlay['markers']);
+        $overlay['labels'] = $this->overlayGutterLabels(
+            $view,
+            $overlay['levels'],
+            $photo,
+            $overlay['angle'] !== '' && ! $side,
+        );
+        $overlay['label_scale'] = $this->overlayLabelScale($photo);
 
         // Grid goes first and markers last, so the template can emit the
         // layers in the order the reference plates stack them.
         return $overlay;
+    }
+
+    /**
+     * The labels printed in the gutters beside a posture photo.
+     *
+     * The level lines already carry the reading for every measured row, so the
+     * gutters only repeat that reading outside the body: the level name (with
+     * its table code) on the left, the stored deviation on the right. The side
+     * profiles are the exception — one landmark per level, so the name and its
+     * value travel together in the gutter nearest that landmark.
+     *
+     * Label centres start at the level's own height and are then pushed apart
+     * just enough that two boxes never overlap. The leader lines are emitted as
+     * rotated strips, so a label that moved a little still points exactly at
+     * its level endpoint instead of at an empty strip of grid.
+     *
+     * @param  array<int, array<string, mixed>>  $levels
+     * @return array<int, array<string, mixed>>
+     */
+    /**
+     * How much the gutter labels are scaled down for a short photo.
+     *
+     * A portrait plate is 232pt tall at the report's photo width; a square or
+     * landscape upload is shorter. Shrinking the label type (and the reserved
+     * box heights) keeps the whole column inside the plate instead of letting
+     * the last row run past the photo.
+     */
+    private function overlayLabelScale(array $photo): float
+    {
+        $boxH = (float) ($photo['box_h'] ?? 232.0);
+
+        return max(0.7, min(1.0, $boxH / 232.0));
+    }
+
+    private function overlayGutterLabels(string $view, array $levels, array $photo, bool $hasAlignmentTag): array
+    {
+        if ($levels === []) {
+            return [];
+        }
+
+        $boxH = (float) $photo['box_h'];
+        $imgLeft = (float) $photo['img_left'];
+        $imgW = (float) $photo['img_w'];
+        $sideView = in_array($view, self::MIRRORED_VIEWS, true);
+        $scale = $this->overlayLabelScale($photo);
+        $gap = max(1.5, 4.0 * $scale);
+
+        $rows = [];
+
+        foreach ($levels as $level) {
+            $label = (string) ($level['label'] ?? '');
+            if ($label === '') {
+                continue;
+            }
+
+            $codes = self::OV_LEVEL_SECTIONS[$view][$label] ?? [];
+            $hint = implode('/', $codes);
+
+            if ($sideView) {
+                $point = $level['point'] ?? null;
+                if ($point === null) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'label' => $label,
+                    'code' => $hint,
+                    'deg' => (string) ($level['deg'] ?? ''),
+                    'y' => (float) $point[1],
+                    'anchor' => [(float) $point[0], (float) $point[1]],
+                    'side' => (string) ($level['side'] ?? 'left'),
+                    'height' => (($level['deg'] ?? '') !== '' ? 26.0 : ($hint !== '' ? 17.0 : 11.0)) * $scale,
+                ];
+
+                continue;
+            }
+
+            $p1 = $level['p1'] ?? null;
+            $p2 = $level['p2'] ?? null;
+
+            if ($p1 === null || $p2 === null) {
+                continue;
+            }
+
+            $rows[] = [
+                'label' => $label,
+                'code' => $hint,
+                'deg' => (string) ($level['deg'] ?? ''),
+                'y' => round((((float) $p1[1]) + ((float) $p2[1])) / 2, 1),
+                'name_anchor' => (float) $p1[0] <= (float) $p2[0] ? $p1 : $p2,
+                'value_anchor' => (float) $p1[0] <= (float) $p2[0] ? $p2 : $p1,
+                // A long name wraps onto a second line inside the narrow
+                // gutter, so it needs more room than a one-word level.
+                'height' => ($hint !== ''
+                    ? (strlen($label) > 12 ? 24.0 : 17.0)
+                    : (strlen($label) > 12 ? 18.0 : 11.0)) * $scale,
+            ];
+        }
+
+        if ($rows === []) {
+            return [];
+        }
+
+        usort($rows, fn (array $a, array $b) => $a['y'] <=> $b['y']);
+
+        // Reserve the strip holding the 0°/alignment tags at the top and the
+        // Alignment tag at the bottom, so no gutter label can run under them.
+        // Both tags have a fixed type size, so their bands do not scale with
+        // the labels.
+        $top = $hasAlignmentTag ? 16.0 : 4.0;
+        $bottom = $boxH - 24.0;
+
+        $centres = [];
+        $cursor = $top;
+
+        foreach ($rows as $index => $row) {
+            $centre = max((float) $row['y'], $cursor + ($row['height'] / 2));
+            $centres[$index] = $centre;
+            $cursor = $centre + ($row['height'] / 2) + $gap;
+        }
+
+        $last = count($rows) - 1;
+        $excess = ($centres[$last] + ($rows[$last]['height'] / 2)) - $bottom;
+
+        if ($excess > 0) {
+            // The labels follow the body top to bottom, so a low foot label can
+            // push the last box past the plate. Compress the spacing between
+            // the boxes instead of shifting the whole column, which would push
+            // the head label above the photo.
+            $spaces = [];
+
+            for ($index = 0; $index < $last; $index++) {
+                $spaces[$index] = max(0.0, $centres[$index + 1] - $centres[$index]
+                    - (($rows[$index]['height'] + $rows[$index + 1]['height']) / 2));
+            }
+
+            $total = array_sum($spaces);
+            $minimum = 1.0 * $last;
+            $available = max($minimum, $total - $excess);
+            $factor = $total > 0 ? $available / $total : 0.0;
+
+            $centres[0] = max($centres[0], $top + ($rows[0]['height'] / 2));
+
+            for ($index = 0; $index < $last; $index++) {
+                $centres[$index + 1] = $centres[$index]
+                    + (($rows[$index]['height'] + $rows[$index + 1]['height']) / 2)
+                    + ($spaces[$index] * $factor);
+            }
+
+            // If the anchors were clustered low on the body, the compressed
+            // column can still hang past the plate. Slide the whole column up
+            // as far as the top reserve allows.
+            $overflow = ($centres[$last] + ($rows[$last]['height'] / 2)) - $bottom;
+            $headroom = $centres[0] - ($top + ($rows[0]['height'] / 2));
+
+            if ($overflow > 0 && $headroom > 0) {
+                $shift = min($overflow, $headroom);
+
+                foreach ($centres as $index => $centre) {
+                    $centres[$index] = $centre - $shift;
+                }
+            }
+        }
+
+        $labels = [];
+        $leaderInset = 3.0;
+        $leftGutterEdge = $imgLeft - $leaderInset;
+        $rightGutterEdge = $imgLeft + $imgW + $leaderInset;
+
+        foreach ($rows as $index => $row) {
+            $centre = round($centres[$index], 1);
+            $height = (float) $row['height'];
+
+            if ($sideView) {
+                $right = ($row['side'] ?? 'left') === 'right';
+                $anchor = $row['anchor'];
+
+                $labels[] = [
+                    'side' => $right ? 'right' : 'left',
+                    'code' => $row['code'],
+                    'label' => $row['label'],
+                    'deg' => $row['deg'],
+                    'label_top' => round($centre - ($height / 2), 1),
+                    'label_height' => $height,
+                    'leader' => $right
+                        ? $this->overlayLine($anchor[0], $anchor[1], $rightGutterEdge, $centre)
+                        : $this->overlayLine($leftGutterEdge, $centre, $anchor[0], $anchor[1]),
+                ];
+
+                continue;
+            }
+
+            $nameAnchor = $row['name_anchor'];
+            $valueAnchor = $row['value_anchor'];
+
+            $labels[] = [
+                'side' => 'left',
+                'code' => $row['code'],
+                'label' => $row['label'],
+                'deg' => '',
+                'label_top' => round($centre - ($height / 2), 1),
+                'label_height' => $height,
+                'leader' => $this->overlayLine($leftGutterEdge, $centre, $nameAnchor[0], $nameAnchor[1]),
+            ];
+
+            if ($row['deg'] !== '') {
+                $labels[] = [
+                    'side' => 'right',
+                    'code' => '',
+                    'label' => '',
+                    'deg' => $row['deg'],
+                    'label_top' => round($centre - (5.0 * $scale), 1),
+                    'label_height' => 10.0 * $scale,
+                    'leader' => $this->overlayLine($valueAnchor[0], $valueAnchor[1], $rightGutterEdge, $centre),
+                ];
+            }
+        }
+
+        return $labels;
     }
 
     /**

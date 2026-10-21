@@ -33,13 +33,12 @@
         <div class="ov-align" style="left: {{ $ov['align']['left'] }}pt; top: {{ $ov['align']['top'] }}pt; width: {{ $ov['align']['width'] }}pt; transform: rotate({{ $ov['align']['angle'] }}deg)"></div>
     @endif
 
-    {{-- Orange level lines, each carrying its tilt --}}
+    {{-- Orange level lines, each carrying its tilt. Their names and stored
+         deviations are printed in the gutters by posture-labels.blade.php, so
+         no value is placed on top of the body. --}}
     @foreach ($ov['levels'] as $level)
         @if ($level['width'] > 0)
             <div class="ov-level" style="left: {{ $level['left'] }}pt; top: {{ $level['top'] }}pt; width: {{ $level['width'] }}pt; transform: rotate({{ $level['angle'] }}deg)"></div>
-        @endif
-        @if ($level['deg'] !== '')
-            <div class="ov-deg" style="left: {{ $level['left'] }}pt; top: {{ round($level['top'] - 10, 1) }}pt">{{ $level['deg'] }}</div>
         @endif
     @endforeach
 
@@ -53,9 +52,10 @@
         <div class="ov-mk" style="left: {{ $marker['left'] }}pt; top: {{ $marker['top'] }}pt"></div>
     @endforeach
 
-    {{-- Angle labels --}}
+    {{-- Angle labels. The alignment tag sits in the bottom of the left gutter,
+         clear of both the feet and the label column. --}}
     @if ($ov['angle'] !== '')
-        <div class="ov-align-tag" style="left: {{ $photo['img_left'] }}pt; top: {{ round($photo['box_h'] - 13, 1) }}pt">Alignment {{ $ov['angle'] }}</div>
+        <div class="ov-align-tag" style="left: 2pt; top: {{ round($photo['box_h'] - 13, 1) }}pt">Alignment {{ $ov['angle'] }}</div>
     @endif
     @if ($upright && $ov['angle'] !== '')
         <div class="ov-tag ov-tag-green" style="left: {{ round($ov['plumb']['left'] - 24, 1) }}pt; top: 2pt">0°</div>

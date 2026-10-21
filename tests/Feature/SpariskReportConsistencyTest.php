@@ -3,6 +3,7 @@
 use App\Models\AssessmentImage;
 use App\Models\Patient;
 use App\Models\PostureAssessment;
+use App\Models\PostureSetting;
 use App\Services\Sparisk\SpariskInterpretationEngine;
 use App\Services\Sparisk\SpariskMeasurementEngine;
 use App\Services\Sparisk\SpariskReportPdfService;
@@ -24,7 +25,7 @@ beforeEach(function () {
 const SPARISK_OVERLAY_LEVELS = [
     'right_side' => ['Head' => 'C2', 'Shoulders' => 'C3', 'Pelvis' => 'C4', 'Femur' => 'C5', 'Tibia' => 'C6', 'Foot' => 'C7'],
     'left_side' => ['Head' => 'D2', 'Shoulders' => 'D3', 'Pelvis' => 'D4', 'Femur' => 'D5', 'Tibia' => 'D6', 'Foot' => 'D7'],
-    'front' => ['Head' => 'A2', 'Acrom.' => 'A3', 'Ribc.' => 'A5', 'ASIS' => 'A7'],
+    'front' => ['Head' => 'A2', 'Acrom.' => 'A3', 'Axill.' => 'A4', 'Ribc.' => 'A5', 'Torso' => 'A6', 'ASIS' => 'A7'],
     'back' => ['Ears' => 'B2', 'Shoulders' => 'B3', 'Axillae' => 'B4', 'Top of the curve' => 'B5', 'PSIS' => 'B6', 'Knees' => 'B7', 'Feet' => 'B8'],
 ];
 
@@ -140,7 +141,7 @@ it('prints each side line and table row with the same stored value', function ()
 it('prints both sides on the paired front lines', function () {
     $assessment = sparisk_photo_assessment(
         'front',
-        ['A1' => 0.7, 'A2' => -1.3, 'A3' => 0.2, 'A5' => -3.7, 'A7' => 3.9, 'A8' => -4.3, 'A9' => -4.9, 'A10' => 40.2, 'A11' => 29.9],
+        ['A1' => 0.7, 'A2' => -1.3, 'A3' => 0.2, 'A4' => 2.8, 'A5' => -3.7, 'A6' => 1.1, 'A7' => 3.9, 'A8' => -4.3, 'A9' => -4.9, 'A10' => 40.2, 'A11' => 29.9],
         [
             7 => [0.46, 0.10], 8 => [0.54, 0.10],
             11 => [0.40, 0.22], 12 => [0.60, 0.22],
@@ -173,7 +174,7 @@ it('shows the published tolerance the point status was judged on', function () {
 });
 
 it('reports no tolerance band for a parameter that has no approved reference', function () {
-    \App\Models\PostureSetting::where('view', 'right_side')->where('section', 'C3')->delete();
+    PostureSetting::where('view', 'right_side')->where('section', 'C3')->delete();
 
     $assessment = sparisk_photo_assessment(
         'right_side',
@@ -189,4 +190,99 @@ it('reports no tolerance band for a parameter that has no approved reference', f
         ->and($rows['C3']['reference'])->toBeNull()
         ->and($rows['C3']['status'])->toBe('Baseline / Change Tracking')
         ->and($levels['Shoulders']['deg'])->toBe($rows['C3']['deviation'].'°');
+});
+
+/** Upright landmarks with the head, shoulders, hips, knees and feet apart. */
+function sparisk_upright_points(): array
+{
+    return [
+        7 => [0.46, 0.10], 8 => [0.54, 0.10],
+        11 => [0.40, 0.22], 12 => [0.60, 0.22],
+        23 => [0.42, 0.52], 24 => [0.58, 0.52],
+        25 => [0.42, 0.72], 26 => [0.58, 0.72],
+        27 => [0.44, 0.92], 28 => [0.56, 0.92],
+        31 => [0.44, 0.95], 32 => [0.56, 0.95],
+    ];
+}
+
+dataset('photo views', ['front', 'back', 'right_side', 'left_side']);
+
+it('prints every photo label in the gutters, never on the patient', function (string $view) {
+    $angles = match ($view) {
+        'front' => ['A1' => 0.7, 'A2' => -1.3, 'A3' => 0.2, 'A4' => 2.8, 'A5' => -3.7, 'A6' => 1.1, 'A7' => 3.9, 'A8' => -4.3, 'A9' => -4.9, 'A10' => 40.2, 'A11' => 29.9],
+        'back' => ['B1' => 0.4, 'B2' => -1.1, 'B3' => -0.3, 'B4' => 4.3, 'B5' => 1.3, 'B6' => 0.4, 'B7' => -3.8, 'B8' => 42.9],
+        'right_side' => ['C1' => 2.3, 'C2' => 14.4, 'C3' => -69.3, 'C4' => -11.2, 'C5' => -11.4, 'C6' => 10.6, 'C7' => -0.7],
+        'left_side' => ['D1' => -2.5, 'D2' => -2.5, 'D3' => -70.1, 'D4' => -16.3, 'D5' => -9.3, 'D6' => -12.5, 'D7' => -3.6],
+    };
+
+    $points = in_array($view, ['right_side', 'left_side'], true)
+        ? sparisk_side_points()
+        : sparisk_upright_points();
+
+    $assessment = sparisk_photo_assessment($view, $angles, $points);
+    $photo = sparisk_report_data($assessment)['images'][$view];
+    $labels = $photo['overlay']['labels'];
+
+    expect($labels)->not->toBeEmpty();
+
+    $gutter = (new ReflectionClassConstant(SpariskReportPdfService::class, 'PHOTO_GUTTER'))->getValue();
+    $labelWidth = (new ReflectionClassConstant(SpariskReportPdfService::class, 'LABEL_WIDTH'))->getValue();
+
+    $left = array_values(array_filter($labels, fn (array $label) => $label['side'] === 'left'));
+    $right = array_values(array_filter($labels, fn (array $label) => $label['side'] === 'right'));
+
+    // A left label ends before the photo begins; a right label starts after it.
+    expect($labelWidth)->toBeLessThanOrEqual($photo['img_left'])
+        ->and($photo['box_w'] - $labelWidth)->toBeGreaterThanOrEqual($photo['img_left'] + $photo['img_w']);
+
+    // The name column is complete for every level; the value column carries
+    // the same stored reading as the overlay line.
+    $levels = collect($photo['overlay']['levels'])->keyBy('label');
+    foreach ($levels as $label => $level) {
+        $named = collect($labels)->firstWhere('label', $label);
+
+        expect($named)->not->toBeNull();
+
+        if ($level['deg'] !== '') {
+            $valued = collect($labels)->firstWhere('deg', $level['deg']);
+
+            expect($valued)->not->toBeNull();
+        }
+    }
+
+    // No two boxes in one gutter may overlap, and none may leave the plate.
+    foreach ([$left, $right] as $column) {
+        if ($column === []) {
+            continue;
+        }
+
+        usort($column, fn (array $a, array $b) => $a['label_top'] <=> $b['label_top']);
+
+        expect($column[0]['label_top'])->toBeGreaterThanOrEqual(0.0);
+
+        for ($i = 1; $i < count($column); $i++) {
+            expect($column[$i]['label_top'])
+                ->toBeGreaterThanOrEqual($column[$i - 1]['label_top'] + $column[$i - 1]['label_height']);
+        }
+
+        $last = end($column);
+        expect($last['label_top'] + $last['label_height'])->toBeLessThanOrEqual($photo['box_h']);
+    }
+})->with('photo views');
+
+it('renders the report with the gutter labels without a template error', function () {
+    $assessment = sparisk_photo_assessment(
+        'front',
+        ['A1' => 0.7, 'A2' => -1.3, 'A3' => 0.2, 'A4' => 2.8, 'A5' => -3.7, 'A6' => 1.1, 'A7' => 3.9, 'A8' => -4.3, 'A9' => -4.9, 'A10' => 40.2, 'A11' => 29.9],
+        sparisk_upright_points(),
+    );
+
+    $data = sparisk_report_data($assessment);
+    $service = app(SpariskReportPdfService::class);
+    $make = new ReflectionMethod($service, 'make');
+    $make->setAccessible(true);
+
+    $pdf = $make->invoke($service, $data);
+
+    expect($pdf->output())->toStartWith('%PDF');
 });
