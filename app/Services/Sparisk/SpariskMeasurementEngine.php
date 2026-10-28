@@ -312,6 +312,43 @@ class SpariskMeasurementEngine
     }
 
     /**
+     * The point-band rule as one printable sentence.
+     *
+     * The thresholds live in `config('sparisk.deviation_bands')` only; this
+     * method turns them into the wording the PDF, web portal and app display,
+     * so the report can never describe a different rule from the one the engine
+     * applied.
+     */
+    public function bandsRuleText(): string
+    {
+        $bands = config('sparisk.deviation_bands');
+        $labels = config('sparisk.posture_output_statuses');
+
+        $on = (float) ($bands['on_point'] ?? 1.0);
+        $near = (float) ($bands['near_point'] ?? 2.0);
+
+        return sprintf(
+            '%s: |deviation| ≤ %s × tolerance. %s: %s × tolerance < |deviation| ≤ %s × tolerance. %s: |deviation| > %s × tolerance.',
+            $labels['on_point']['label'] ?? 'On Point',
+            $on,
+            $labels['near_point']['label'] ?? 'Near Point',
+            $on,
+            $near,
+            $labels['off_point']['label'] ?? 'Off Point',
+            $near,
+        );
+    }
+
+    /**
+     * The axis, landmarks and sign convention for a measurement section, from
+     * the single shared definition table.
+     */
+    public function definitionFor(string $section): ?array
+    {
+        return config("sparisk.measurement_definitions.{$section}");
+    }
+
+    /**
      * Build the plain-language interpretation for a measurement.
      */
     public function interpretation(string $section, array $def, string $status, bool $isAbove): string

@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
     DialogContent,
@@ -16,572 +17,1054 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 import { type BreadcrumbItem } from '@/types';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+    Copy,
+    FlipHorizontal2,
+    ImageUp,
+    MousePointerClick,
+    Plus,
+    RotateCcw,
+    Search,
+    Trash2,
+    X,
+} from 'lucide-react';
 
-interface Marker {
+type Gender = 'male' | 'female';
+
+interface Highlight {
     id: number;
+    muscle_condition_id: number;
+    gender: Gender;
     view: string;
-    gender: string;
-    severity: string;
-    type: string;
-    color: string | null;
-    status_label: string;
-    label: string | null;
-    muscle: string | null;
+    muscle: string;
+    status: string;
     x: number;
     y: number;
     width: number;
     height: number;
-    condition: string | null;
+    rotation: number;
+    /** Muscle outline inside the box (-0.5..0.5 per axis); null draws an ellipse. */
+    points: [number, number][] | null;
     order_index: number;
+}
+
+interface Condition {
+    id: number;
+    slug: string;
+    name: string;
+    description: string | null;
+    effects: string | null;
+    detection: { classifications?: string[]; sections?: { section: string; level?: string[]; direction?: string }[] } | null;
+    is_active: boolean;
+    highlights: Highlight[];
+}
+
+interface StatusMeta {
+    label: string;
+    hint: string;
+    color: string;
+}
+
+interface ConditionDraft {
+    id?: number;
+    name: string;
+    description: string;
+    effects: string;
+    classifications: string[];
     is_active: boolean;
 }
 
-type MarkerDraft = Partial<Marker>;
-
-/**
- * The one label a marker prints. `status_label` comes from the backend so the
- * admin list, the app body view and the marker detail sheet all read the same
- * word; the fallback keeps older payloads readable.
- */
-const statusLabelOf = (m: { status_label?: string | null; severity?: string | null; type?: string | null }) => {
-    const label = (m.status_label ?? '').trim();
-    if (label) return label;
-
-    const severity = (m.severity ?? '').trim().toLowerCase();
-    if (severity === 'moderate') return (m.type ?? '').trim().toLowerCase() === 'weak' ? 'Weak' : 'Tight';
-    if (severity === 'severe') return 'Severe';
-    return 'Normal';
-};
-
-const TYPE_DEFAULT_COLOR: Record<string, string> = {
-    tight: '#fde047', // light yellow
-    weak: '#16a34a',
-    normal: '#94a3b8',
-};
-
-// The result severity drives the highlight colour so a problem area reads at a
-// glance: moderate = orange, severe = red. Normal keeps the tight (yellow) /
-// weak (green) muscle colours, and an explicit colour still applies there.
-const SEVERITY_COLOR: Record<string, string> = {
-    moderate: '#f97316', // orange
-    severe: '#ef4444', // red
-};
-
-const severityColor = (severity?: string | null) => SEVERITY_COLOR[(severity ?? '').trim().toLowerCase()];
-
-const markerColor = (m: { type?: string; color?: string | null; severity?: string }) => {
-    const severity = severityColor(m.severity);
-    if (severity) return severity;
-    return m.color && m.color.trim() ? m.color : (TYPE_DEFAULT_COLOR[m.type ?? 'tight'] ?? '#94a3b8');
-};
-
-const VIEW_LABELS: Record<string, string> = {
-    front: 'Front View',
-    back: 'Back View',
-    right_side: 'Right Side',
-    left_side: 'Left Side',
-};
+const GENDER_LABELS: Record<Gender, string> = { male: 'Boy', female: 'Girl' };
 
 const clamp = (value: number, min = 0, max = 1) => Math.min(max, Math.max(min, value));
 
+/** An ellipse as an editable outline, used for new and older highlights. */
+const ellipseOutline = (count = 10): [number, number][] =>
+    Array.from({ length: count }, (_, i) => {
+        const a = (2 * Math.PI * i) / count - Math.PI / 2;
+        return [Math.round(Math.cos(a) * 50) / 100, Math.round(Math.sin(a) * 50) / 100];
+    });
+
+/**
+ * A closed, smooth SVG path through the outline points (Catmull-Rom turned
+ * into cubic Béziers), in the -0.5..0.5 box space. The app draws the same
+ * curve, so the shape on the admin page is the shape the patient sees.
+ */
+const smoothPath = (points: [number, number][]) => {
+    const n = points.length;
+    if (n < 3) return '';
+    const p = (i: number) => points[(i + n) % n];
+    let d = `M ${p(0)[0]} ${p(0)[1]}`;
+    for (let i = 0; i < n; i++) {
+        const [p0, p1, p2, p3] = [p(i - 1), p(i), p(i + 1), p(i + 2)];
+        const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+        const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+        d += ` C ${c1[0]} ${c1[1]} ${c2[0]} ${c2[1]} ${p2[0]} ${p2[1]}`;
+    }
+    return `${d} Z`;
+};
+
+const outlineOf = (h: Pick<Highlight, 'points'>) => (h.points && h.points.length >= 3 ? h.points : ellipseOutline());
+
+const draftOf = (c?: Condition): ConditionDraft => ({
+    id: c?.id,
+    name: c?.name ?? '',
+    description: c?.description ?? '',
+    effects: c?.effects ?? '',
+    classifications: c?.detection?.classifications ?? [],
+    is_active: c?.is_active ?? true,
+});
+
+type Interaction =
+    | { mode: 'move'; id: number; offsetX: number; offsetY: number }
+    | { mode: 'resize'; id: number }
+    | { mode: 'rotate'; id: number }
+    | { mode: 'vertex'; id: number; index: number };
+
 export default function Index({
-    markers,
-    views,
-    genders,
-    types,
-    severities,
     conditions,
-    characterImages,
+    statuses,
+    views,
+    bodyImages,
+    customImages,
+    classificationOptions,
 }: {
-    markers: Marker[];
-    views: string[];
-    genders: string[];
-    types: string[];
-    severities: string[];
-    conditions: Record<string, string>;
-    characterImages: Record<'male' | 'female', Record<string, string>>;
+    conditions: Condition[];
+    statuses: Record<string, StatusMeta>;
+    views: Record<string, string>;
+    bodyImages: Record<Gender, Record<string, string>>;
+    customImages: string[];
+    classificationOptions: Record<string, string>;
 }) {
-    const [view, setView] = useState<string>('front');
-    const [imageGender, setImageGender] = useState<'male' | 'female'>('male');
-    const [severity, setSeverity] = useState<string>('normal');
-    const [condition, setCondition] = useState<string>('');
-    const [local, setLocal] = useState<Marker[]>(markers);
+    const [conditionId, setConditionId] = useState<number | null>(conditions[0]?.id ?? null);
+    const [gender, setGender] = useState<Gender>('male');
+    const [view, setView] = useState<string>(Object.keys(views)[0] ?? 'front');
+    const [paintStatus, setPaintStatus] = useState<string>('tight');
+    const [selectedId, setSelectedId] = useState<number | null>(null);
+    const [selectedPoint, setSelectedPoint] = useState<number | null>(null);
+    const [search, setSearch] = useState('');
 
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [isEdit, setIsEdit] = useState(false);
-    const [draft, setDraft] = useState<MarkerDraft>({});
+    const [local, setLocal] = useState<Highlight[]>([]);
+    const localRef = useRef<Highlight[]>([]);
+    const interactionRef = useRef<Interaction | null>(null);
+    const movedRef = useRef(false);
+    const interactedRef = useRef(false);
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
+    const selectNewestRef = useRef(false);
 
-    const containerRef = useRef<HTMLDivElement>(null);
-    const dragIdRef = useRef<number | null>(null);
-    const resizeIdRef = useRef<number | null>(null);
-    const localRef = useRef<Marker[]>(markers);
+    const [conditionDialog, setConditionDialog] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState(false);
+    const [newName, setNewName] = useState('');
+    const [draft, setDraft] = useState<ConditionDraft>(draftOf(conditions[0]));
 
-    useEffect(() => setLocal(markers), [markers]);
+    const condition = useMemo(() => conditions.find((c) => c.id === conditionId) ?? null, [conditions, conditionId]);
+
+    // Server props are the source of truth; local copies only carry the shape
+    // being dragged until the drop is saved.
     useEffect(() => {
-        localRef.current = local;
-    }, [local]);
+        const all = conditions.flatMap((c) => c.highlights);
+        setLocal(all);
+        localRef.current = all;
 
-    // Male and female markers are independent, and each severity result has
-    // its own marker set, so only the matching markers are shown/edited.
+        if (selectNewestRef.current && condition) {
+            selectNewestRef.current = false;
+            const newest = condition.highlights
+                .filter((h) => h.gender === gender && h.view === view)
+                .reduce<Highlight | null>((a, b) => (!a || b.id > a.id ? b : a), null);
+            setSelectedId(newest?.id ?? null);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conditions]);
+
+    useEffect(() => {
+        if (!condition && conditions.length) setConditionId(conditions[conditions.length - 1].id);
+    }, [condition, conditions]);
+
+    useEffect(() => setDraft(draftOf(condition ?? undefined)), [condition]);
+    useEffect(() => setSelectedId(null), [conditionId, gender, view]);
+    useEffect(() => setSelectedPoint(null), [selectedId]);
+
     const visible = useMemo(
-        () =>
-            local.filter((m) => {
-                if (m.view !== view || m.gender !== imageGender) return false;
-                // Condition sets (SATA figures) are separate from severity sets.
-                if (condition) return m.condition === condition;
-                return !m.condition && m.severity === severity;
-            }),
-        [local, view, imageGender, severity, condition],
+        () => local.filter((h) => h.muscle_condition_id === conditionId && h.gender === gender && h.view === view),
+        [local, conditionId, gender, view],
+    );
+    const selected = visible.find((h) => h.id === selectedId) ?? null;
+
+    const muscleSuggestions = useMemo(
+        () => Array.from(new Set(local.map((h) => h.muscle))).sort((a, b) => a.localeCompare(b)),
+        [local],
     );
 
-    const imageUrl = characterImages[imageGender]?.[view] ?? '';
+    const filteredConditions = conditions.filter((c) => c.name.toLowerCase().includes(search.trim().toLowerCase()));
 
-    const openAdd = (x: number, y: number) => {
-        setDraft({
+    const colorOf = (status: string) => statuses[status]?.color ?? '#64748b';
+    const imageUrl = bodyImages[gender]?.[view] ?? '';
+    const hasCustomImage = customImages.includes(`${gender}.${view}`);
+
+    // ---- saving ----
+
+    const post = (url: string, data: Record<string, unknown>, success?: string, onSuccess?: () => void) =>
+        router.post(url, data as Parameters<typeof router.post>[1], {
+            preserveScroll: true,
+            preserveState: true,
+            onSuccess: () => {
+                if (success) toast(success);
+                onSuccess?.();
+            },
+            onError: (errors) => toast(Object.values(errors)[0] ?? 'Please check the fields'),
+        });
+
+    const saveHighlight = (h: Highlight) =>
+        post('/posture-markers/highlights/update', { ...h, rotation: Math.round(h.rotation) });
+
+    const patchLocal = (id: number, patch: Partial<Highlight>) => {
+        const next = localRef.current.map((h) => (h.id === id ? { ...h, ...patch } : h));
+        localRef.current = next;
+        setLocal(next);
+    };
+
+    const patchAndSave = (id: number, patch: Partial<Highlight>) => {
+        patchLocal(id, patch);
+        const h = localRef.current.find((m) => m.id === id);
+        if (h) saveHighlight(h);
+    };
+
+    const addHighlight = (x: number, y: number, extra: Partial<Highlight> = {}) => {
+        if (!condition) return;
+        selectNewestRef.current = true;
+        post('/posture-markers/highlights/store', {
+            muscle_condition_id: condition.id,
+            gender,
             view,
-            gender: imageGender,
-            severity,
-            condition: condition || null,
-            type: 'tight',
-            color: TYPE_DEFAULT_COLOR['tight'],
-            label: '',
-            muscle: '',
+            muscle: 'New muscle',
+            status: paintStatus,
             x,
             y,
-            width: 0.12,
-            height: 0.12,
-            order_index: 0,
-            is_active: true,
-        });
-        setIsEdit(false);
-        setDialogOpen(true);
-    };
-
-    const openEdit = (m: Marker) => {
-        setDraft({ ...m });
-        setIsEdit(true);
-        setDialogOpen(true);
-    };
-
-    const submit = () => {
-        const url = isEdit ? '/posture-markers/update' : '/posture-markers/store';
-        router.post(url, draft as any, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setDialogOpen(false);
-                toast(isEdit ? 'Marker updated' : 'Marker created');
-            },
-            onError: () => toast('Please check the marker fields'),
+            width: 0.06,
+            height: 0.08,
+            rotation: 0,
+            points: ellipseOutline(),
+            order_index: visible.length,
+            ...extra,
         });
     };
 
-    const remove = (id: number) => {
-        router.post('/posture-markers/destroy', { id }, { preserveScroll: true, onSuccess: () => toast('Marker deleted') });
+    const mirrorSelected = () => {
+        if (!selected) return;
+        addHighlight(clamp(1 - selected.x), selected.y, {
+            muscle: selected.muscle,
+            status: selected.status,
+            width: selected.width,
+            height: selected.height,
+            rotation: -selected.rotation,
+            points: outlineOf(selected).map(([px, py]) => [-px, py]),
+        });
     };
 
-    const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (dragIdRef.current !== null || resizeIdRef.current !== null) return;
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        openAdd(clamp((e.clientX - rect.left) / rect.width), clamp((e.clientY - rect.top) / rect.height));
+    /** Adds a point halfway to the next one, after the selected point. */
+    const addPoint = () => {
+        if (!selected) return;
+        const pts = outlineOf(selected);
+        const i = selectedPoint ?? pts.length - 1;
+        const [a, b] = [pts[i], pts[(i + 1) % pts.length]];
+        const next = [...pts.slice(0, i + 1), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] as [number, number], ...pts.slice(i + 1)];
+        patchAndSave(selected.id, { points: next });
+        setSelectedPoint(i + 1);
+    };
+
+    const removePoint = () => {
+        if (!selected || selectedPoint === null) return;
+        const pts = outlineOf(selected);
+        if (pts.length <= 3) return;
+        patchAndSave(selected.id, { points: pts.filter((_, i) => i !== selectedPoint) });
+        setSelectedPoint(null);
+    };
+
+    const isSideView = view === 'right_side' || view === 'left_side';
+    const otherSide = view === 'right_side' ? 'left_side' : 'right_side';
+
+    const mirrorToOtherSide = () => {
+        if (!condition || !isSideView) return;
+        post(
+            '/posture-markers/highlights/mirror-side',
+            { muscle_condition_id: condition.id, gender, from: view },
+            `Mirrored to the ${views[otherSide]}`,
+        );
+    };
+
+    const deleteSelected = () => {
+        if (!selected) return;
+        post('/posture-markers/highlights/destroy', { id: selected.id }, 'Muscle highlight removed', () => setSelectedId(null));
+    };
+
+    // ---- canvas interaction ----
+
+    const pointerToNormalized = (e: React.PointerEvent | React.MouseEvent) => {
+        const rect = canvasRef.current!.getBoundingClientRect();
+        return { x: (e.clientX - rect.left) / rect.width, y: (e.clientY - rect.top) / rect.height, rect };
+    };
+
+    const beginInteraction = (e: React.PointerEvent, interaction: Interaction) => {
+        e.stopPropagation();
+        e.preventDefault();
+        interactionRef.current = interaction;
+        movedRef.current = false;
+        interactedRef.current = true;
+        setSelectedId(interaction.id);
+        canvasRef.current?.setPointerCapture?.(e.pointerId);
     };
 
     const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
+        const interaction = interactionRef.current;
+        if (!interaction) return;
+        const h = localRef.current.find((m) => m.id === interaction.id);
+        if (!h) return;
+        const { x, y, rect } = pointerToNormalized(e);
+        movedRef.current = true;
 
-        // Resizing: keep the marker center fixed and grow/shrink symmetrically.
-        if (resizeIdRef.current !== null) {
-            const id = resizeIdRef.current;
-            const marker = localRef.current.find((m) => m.id === id);
-            if (!marker) return;
-            const px = (e.clientX - rect.left) / rect.width;
-            const py = (e.clientY - rect.top) / rect.height;
-            const width = clamp(Math.abs(px - marker.x) * 2, 0.02, 1);
-            const height = clamp(Math.abs(py - marker.y) * 2, 0.02, 1);
-            setLocal((prev) => prev.map((m) => (m.id === id ? { ...m, width, height } : m)));
+        if (interaction.mode === 'move') {
+            patchLocal(h.id, { x: clamp(x - interaction.offsetX), y: clamp(y - interaction.offsetY) });
             return;
         }
 
-        // Moving.
-        if (dragIdRef.current !== null) {
-            const x = clamp((e.clientX - rect.left) / rect.width);
-            const y = clamp((e.clientY - rect.top) / rect.height);
-            setLocal((prev) => prev.map((m) => (m.id === dragIdRef.current ? { ...m, x, y } : m)));
+        // Resize and rotate work in pixels so a rotated shape keeps its form
+        // on a non-square image.
+        const dx = (x - h.x) * rect.width;
+        const dy = (y - h.y) * rect.height;
+
+        if (interaction.mode === 'rotate') {
+            const angle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+            const normalized = ((((angle + 180) % 360) + 360) % 360) - 180;
+            patchLocal(h.id, { rotation: Math.round(normalized) });
+            return;
         }
+
+        const theta = (-h.rotation * Math.PI) / 180;
+        const lx = dx * Math.cos(theta) - dy * Math.sin(theta);
+        const ly = dx * Math.sin(theta) + dy * Math.cos(theta);
+
+        // A point is placed in the shape's own box, so it follows the box
+        // when the shape is later moved, resized or rotated.
+        if (interaction.mode === 'vertex') {
+            const pts = [...outlineOf(h)];
+            pts[interaction.index] = [
+                Math.round(clamp(lx / (h.width * rect.width), -1, 1) * 1000) / 1000,
+                Math.round(clamp(ly / (h.height * rect.height), -1, 1) * 1000) / 1000,
+            ];
+            patchLocal(h.id, { points: pts });
+            return;
+        }
+
+        patchLocal(h.id, {
+            width: clamp((Math.abs(lx) * 2) / rect.width, 0.015, 1),
+            height: clamp((Math.abs(ly) * 2) / rect.height, 0.015, 1),
+        });
     };
 
     const handlePointerUp = () => {
-        const id = resizeIdRef.current ?? dragIdRef.current;
-        const wasResize = resizeIdRef.current !== null;
-        resizeIdRef.current = null;
-        dragIdRef.current = null;
-        if (id === null) return;
-        const marker = localRef.current.find((m) => m.id === id);
-        if (marker) {
-            router.post('/posture-markers/update', marker as any, {
-                preserveScroll: true,
-                onSuccess: () => wasResize && toast('Marker resized'),
-            });
-        }
+        const interaction = interactionRef.current;
+        interactionRef.current = null;
+        if (!interaction || !movedRef.current) return;
+        const h = localRef.current.find((m) => m.id === interaction.id);
+        if (h) saveHighlight(h);
     };
 
-    const breadcrumbs: BreadcrumbItem[] = [{ title: 'Posture Markers', href: '/posture-markers' }];
+    const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        // Pointer capture retargets the click of a shape press to the canvas,
+        // so a press that started on a shape never adds a new one.
+        if (interactedRef.current) {
+            interactedRef.current = false;
+            return;
+        }
+        if (selectedId !== null) {
+            setSelectedId(null);
+            return;
+        }
+        const { x, y } = pointerToNormalized(e);
+        addHighlight(clamp(x), clamp(y));
+    };
+
+    // ---- conditions & images ----
+
+    const saveCondition = () => {
+        if (!draft.id) return;
+        post(
+            '/posture-markers/conditions/update',
+            {
+                id: draft.id,
+                name: draft.name,
+                description: draft.description,
+                effects: draft.effects,
+                detection: { classifications: draft.classifications },
+                is_active: draft.is_active,
+            },
+            'Condition saved',
+        );
+    };
+
+    const createCondition = () => {
+        if (!newName.trim()) return;
+        post('/posture-markers/conditions/store', { name: newName.trim(), is_active: true }, 'Condition created', () => {
+            setConditionDialog(false);
+            setNewName('');
+            setConditionId(null);
+        });
+    };
+
+    const deleteCondition = () => {
+        if (!condition) return;
+        post('/posture-markers/conditions/destroy', { id: condition.id }, 'Condition deleted', () => {
+            setDeleteDialog(false);
+            setConditionId(conditions.find((c) => c.id !== condition.id)?.id ?? null);
+        });
+    };
+
+    const copyToOtherGender = () => {
+        if (!condition) return;
+        const to: Gender = gender === 'male' ? 'female' : 'male';
+        post(
+            '/posture-markers/highlights/copy',
+            { muscle_condition_id: condition.id, from: gender, to },
+            `Copied ${GENDER_LABELS[gender]} highlights to ${GENDER_LABELS[to]}`,
+        );
+    };
+
+    const uploadImage = (file: File) =>
+        router.post(
+            '/posture-markers/body-image',
+            { gender, view, image: file },
+            {
+                forceFormData: true,
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => toast('Body image updated'),
+                onError: (errors) => toast(Object.values(errors)[0] ?? 'Upload failed'),
+            },
+        );
+
+    const countsFor = (c: Condition, g: Gender) =>
+        Object.keys(statuses).map((s) => ({
+            status: s,
+            count: new Set(c.highlights.filter((h) => h.gender === g && h.status === s).map((h) => h.muscle)).size,
+        }));
+
+    // Muscles on the current view, one row per name + status.
+    const muscleRows = useMemo(() => {
+        const rows = new Map<string, { muscle: string; status: string; ids: number[] }>();
+        for (const h of visible) {
+            const key = `${h.status}|${h.muscle}`;
+            const row = rows.get(key) ?? { muscle: h.muscle, status: h.status, ids: [] };
+            row.ids.push(h.id);
+            rows.set(key, row);
+        }
+        return Array.from(rows.values());
+    }, [visible]);
+
+    const breadcrumbs: BreadcrumbItem[] = [{ title: 'Muscle Map', href: '/posture-markers' }];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Posture Markers" />
+            <Head title="Muscle Map" />
 
             <main className="mt-4 flex-1 p-4 sm:px-6">
-                <div className="mb-4">
-                    <h1 className="text-2xl font-semibold">Posture Markers</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Arrange the muscle markers on the character images. Click the image to add a marker,
-                        drag a marker to move it. The mobile app draws them on the patient&apos;s photo and
-                        colours each muscle from its own findings, so one photo can mix bands.
-                    </p>
-                    <p className="mt-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                        Yellow / green = normal · Orange = moderate · Red = severe
-                    </p>
+                <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h1 className="text-2xl font-semibold">Muscle Map</h1>
+                        <p className="max-w-2xl text-sm text-muted-foreground">
+                            Pick a posture condition, then click a muscle on the body to highlight it. The app shows
+                            the patient the conditions their assessment matches, with these muscles and the
+                            problems written below.
+                        </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {Object.entries(statuses).map(([key, s]) => (
+                            <span
+                                key={key}
+                                className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1 text-xs font-medium"
+                                title={s.hint}
+                            >
+                                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: s.color }} />
+                                {s.label}
+                                <span className="hidden text-muted-foreground xl:inline">· {s.hint}</span>
+                            </span>
+                        ))}
+                    </div>
                 </div>
 
-                <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_1fr]">
-                    {/* Character image editor */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Character Image</CardTitle>
-                            <CardDescription>Click to add · drag to reposition</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="mb-3 flex items-center gap-2">
-                                <Select value={imageGender} onValueChange={(v) => setImageGender(v as 'male' | 'female')}>
-                                    <SelectTrigger className="h-8 w-32">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="male">Male</SelectItem>
-                                        <SelectItem value="female">Female</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <div className="flex flex-1 gap-1">
-                                    {views.map((v) => (
-                                        <Button
-                                            key={v}
-                                            size="sm"
-                                            variant={view === v ? 'default' : 'outline'}
-                                            className="h-8 flex-1 px-1 text-[10px]"
-                                            onClick={() => setView(v)}
-                                        >
-                                            {VIEW_LABELS[v] ?? v}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="mb-3 flex items-center gap-2">
-                                <span className="w-16 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase">
-                                    Set
-                                </span>
-                                <Select
-                                    value={condition || 'severity'}
-                                    onValueChange={(v) => setCondition(v === 'severity' ? '' : v)}
-                                >
-                                    <SelectTrigger className="h-8 flex-1">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="severity">Severity sets (Normal / Moderate / Severe)</SelectItem>
-                                        {Object.entries(conditions).map(([slug, label]) => (
-                                            <SelectItem key={slug} value={slug}>
-                                                {label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {!condition && (
-                                <div className="mb-3 flex items-center gap-2">
-                                    <span className="w-16 shrink-0 text-[10px] font-semibold text-muted-foreground uppercase">
-                                        Severity
-                                    </span>
-                                    <div className="flex flex-1 gap-1">
-                                        {severities.map((s) => (
-                                            <Button
-                                                key={s}
-                                                size="sm"
-                                                variant={severity === s ? 'default' : 'outline'}
-                                                className="h-8 flex-1 px-1 text-[10px] capitalize"
-                                                onClick={() => setSeverity(s)}
-                                            >
-                                                {s}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div
-                                ref={containerRef}
-                                onClick={handleContainerClick}
-                                onPointerMove={handlePointerMove}
-                                onPointerUp={handlePointerUp}
-                                onPointerLeave={handlePointerUp}
-                                className="relative mx-auto w-full max-w-[300px] cursor-crosshair touch-none select-none"
-                            >
-                                {imageUrl ? (
-                                    <img src={imageUrl} alt={view} className="block h-auto w-full" draggable={false} />
-                                ) : (
-                                    <div className="flex h-[420px] items-center justify-center rounded bg-muted text-sm text-muted-foreground">
-                                        No image
-                                    </div>
-                                )}
-
-                                {visible.map((m) => (
-                                    <div
-                                        key={m.id}
-                                        onPointerDown={(e) => {
-                                            e.stopPropagation();
-                                            dragIdRef.current = m.id;
-                                            (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        title={m.muscle ?? m.label ?? ''}
-                                        className="absolute cursor-move rounded border-2"
-                                        style={{
-                                            left: `${m.x * 100}%`,
-                                            top: `${m.y * 100}%`,
-                                            width: `${m.width * 100}%`,
-                                            height: `${m.height * 100}%`,
-                                            transform: 'translate(-50%, -50%)',
-                                            backgroundColor: `${markerColor(m)}99`,
-                                            borderColor: markerColor(m),
-                                        }}
-                                    >
-                                        <span className="pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-black/70 px-1 text-[9px] text-white">
-                                            {m.label || m.muscle}
-                                        </span>
-                                        {/* Resize handle (bottom-right) */}
-                                        <span
-                                            onPointerDown={(e) => {
-                                                e.stopPropagation();
-                                                resizeIdRef.current = m.id;
-                                                (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-                                            }}
-                                            onClick={(e) => e.stopPropagation()}
-                                            title="Drag to resize"
-                                            className="absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border border-white bg-slate-700"
-                                        />
-                                    </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Marker list */}
-                    <Card>
-                        <CardHeader>
+                <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)_340px] lg:grid-cols-[240px_minmax(0,1fr)]">
+                    {/* ---------- Conditions ---------- */}
+                    <Card className="h-fit gap-3 py-4">
+                        <CardHeader className="px-4">
                             <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="text-base">
-                                        Markers — {VIEW_LABELS[view] ?? view} ({visible.length})
-                                    </CardTitle>
-                                    <CardDescription className="capitalize">
-                                        {imageGender} · {condition ? (conditions[condition] ?? condition) : `${severity} (severity set)`}
-                                    </CardDescription>
-                                </div>
-                                <Button size="sm" className="h-8 gap-1" onClick={() => openAdd(0.5, 0.5)}>
-                                    <Plus className="h-3.5 w-3.5" /> Add
+                                <CardTitle className="text-base">Conditions</CardTitle>
+                                <Button size="sm" variant="outline" className="h-7 gap-1 px-2" onClick={() => setConditionDialog(true)}>
+                                    <Plus className="h-3.5 w-3.5" /> New
                                 </Button>
                             </div>
+                            <div className="relative mt-2">
+                                <Search className="absolute top-2.5 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search"
+                                    className="h-8 pl-8 text-sm"
+                                />
+                            </div>
                         </CardHeader>
-                        <CardContent>
-                            {visible.length === 0 ? (
-                                <p className="text-sm text-muted-foreground">No markers for this view yet.</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {visible.map((m) => (
-                                        <div
-                                            key={m.id}
-                                            className="flex items-center gap-3 rounded-lg border p-2.5"
-                                        >
-                                            <span
-                                                className="inline-block h-4 w-4 shrink-0 rounded border-2"
-                                                style={{
-                                                    backgroundColor: `${markerColor(m)}99`,
-                                                    borderColor: markerColor(m),
-                                                }}
-                                            />
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="truncate text-sm font-medium">
-                                                        {m.label || m.muscle || 'Marker'}
-                                                    </span>
-                                                    <Badge variant="outline" className="text-[10px]">
-                                                        {statusLabelOf(m)}
-                                                    </Badge>
-                                                    <Badge variant="secondary" className="text-[10px]">
-                                                        {m.gender}
-                                                    </Badge>
-                                                </div>
-                                                <p className="truncate text-xs text-muted-foreground">
-                                                    {m.muscle}
-                                                </p>
-                                            </div>
-                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEdit(m)}>
-                                                <Pencil className="h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button
-                                                size="icon"
-                                                variant="ghost"
-                                                className="h-8 w-8 text-destructive"
-                                                onClick={() => remove(m.id)}
-                                            >
-                                                <Trash2 className="h-3.5 w-3.5" />
-                                            </Button>
+                        <CardContent className="space-y-1 px-2">
+                            {filteredConditions.map((c) => {
+                                const active = c.id === conditionId;
+                                return (
+                                    <button
+                                        key={c.id}
+                                        type="button"
+                                        onClick={() => setConditionId(c.id)}
+                                        className={cn(
+                                            'w-full rounded-lg px-3 py-2 text-left transition-colors',
+                                            active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                                        )}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <span className="flex-1 truncate text-sm font-medium">{c.name}</span>
+                                            {!c.is_active && (
+                                                <span className={cn('text-[10px] uppercase', active ? 'opacity-80' : 'text-muted-foreground')}>
+                                                    Hidden
+                                                </span>
+                                            )}
                                         </div>
-                                    ))}
-                                </div>
+                                        <div className="mt-1 flex gap-2">
+                                            {countsFor(c, gender).map(({ status, count }) => (
+                                                <span key={status} className="inline-flex items-center gap-1 text-[11px] opacity-90">
+                                                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorOf(status) }} />
+                                                    {count}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                            {filteredConditions.length === 0 && (
+                                <p className="px-3 py-6 text-center text-sm text-muted-foreground">No conditions found.</p>
                             )}
                         </CardContent>
                     </Card>
-                </div>
 
-                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                    <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                            <DialogTitle>{isEdit ? 'Edit Marker' : 'Add Marker'}</DialogTitle>
-                            <DialogDescription>
-                                Normalized position ({draft.x?.toFixed(3)}, {draft.y?.toFixed(3)}).
-                            </DialogDescription>
-                        </DialogHeader>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2">
-                                <Label className="text-xs">Muscle / Region</Label>
-                                <Input
-                                    value={draft.muscle ?? ''}
-                                    onChange={(e) => setDraft({ ...draft, muscle: e.target.value })}
-                                    placeholder="e.g. Upper Trapezius"
-                                />
-                            </div>
-                            <div className="col-span-2">
-                                <Label className="text-xs">Label</Label>
-                                <Input
-                                    value={draft.label ?? ''}
-                                    onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-                                    placeholder="Short label shown on the image"
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">Type</Label>
-                                <Select value={draft.type} onValueChange={(v) => setDraft({ ...draft, type: v })}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {types.map((t) => (
-                                            <SelectItem key={t} value={t} className="capitalize">
-                                                {t}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Colour</Label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="color"
-                                        value={markerColor(draft)}
-                                        onChange={(e) => setDraft({ ...draft, color: e.target.value })}
-                                        className="h-9 w-12 shrink-0 cursor-pointer rounded border"
-                                        title="Marker colour"
-                                    />
-                                    <Input
-                                        value={draft.color ?? ''}
-                                        onChange={(e) => setDraft({ ...draft, color: e.target.value })}
-                                        placeholder={TYPE_DEFAULT_COLOR[draft.type ?? 'tight']}
-                                    />
+                    {/* ---------- Body canvas ---------- */}
+                    <Card className="gap-3 py-4">
+                        <CardHeader className="px-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <div>
+                                    <CardTitle className="text-base">{condition?.name ?? 'No condition selected'}</CardTitle>
+                                    <CardDescription>
+                                        {selected ? 'Drag the muscle to move · dots to reshape · corner to resize · top dot to rotate' : 'Click on the body to add a muscle'}
+                                    </CardDescription>
+                                </div>
+                                <div className="ml-auto flex rounded-lg border p-0.5">
+                                    {(Object.keys(GENDER_LABELS) as Gender[]).map((g) => (
+                                        <button
+                                            key={g}
+                                            type="button"
+                                            onClick={() => setGender(g)}
+                                            className={cn(
+                                                'rounded-md px-3 py-1 text-xs font-semibold transition-colors',
+                                                gender === g ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
+                                            )}
+                                        >
+                                            {GENDER_LABELS[g]}
+                                        </button>
+                                    ))}
                                 </div>
                             </div>
-                            <div>
-                                <Label className="text-xs">Gender</Label>
-                                <Select value={draft.gender} onValueChange={(v) => setDraft({ ...draft, gender: v })}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {genders.map((g) => (
-                                            <SelectItem key={g} value={g} className="capitalize">
-                                                {g}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-3">
+                                <div className="flex rounded-lg bg-muted p-0.5">
+                                    {Object.entries(views).map(([key, label]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setView(key)}
+                                            className={cn(
+                                                'rounded-md px-3 py-1 text-xs font-semibold transition-colors',
+                                                view === key ? 'bg-background shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                                            )}
+                                        >
+                                            {label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <MousePointerClick className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <span className="text-xs text-muted-foreground">New muscle as</span>
+                                    {Object.entries(statuses).map(([key, s]) => (
+                                        <button
+                                            key={key}
+                                            type="button"
+                                            onClick={() => setPaintStatus(key)}
+                                            className={cn(
+                                                'rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-all',
+                                                paintStatus === key ? 'text-white shadow-sm' : 'bg-background',
+                                            )}
+                                            style={
+                                                paintStatus === key
+                                                    ? { backgroundColor: s.color, borderColor: s.color }
+                                                    : { color: s.color, borderColor: `${s.color}66` }
+                                            }
+                                        >
+                                            {s.label}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <div>
-                                <Label className="text-xs">Severity</Label>
-                                <Select
-                                    value={draft.severity ?? 'normal'}
-                                    onValueChange={(v) => setDraft({ ...draft, severity: v })}
+                        </CardHeader>
+
+                        <CardContent className="px-4">
+                            <div className="rounded-xl bg-gradient-to-b from-slate-50 to-slate-100 p-4 dark:from-slate-900 dark:to-slate-950">
+                                <div
+                                    ref={canvasRef}
+                                    onClick={condition ? handleCanvasClick : undefined}
+                                    onPointerMove={handlePointerMove}
+                                    onPointerUp={handlePointerUp}
+                                    onPointerCancel={handlePointerUp}
+                                    className={cn(
+                                        'relative mx-auto w-full max-w-[380px] touch-none select-none',
+                                        condition ? 'cursor-crosshair' : 'cursor-not-allowed opacity-60',
+                                    )}
                                 >
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {severities.map((s) => (
-                                            <SelectItem key={s} value={s} className="capitalize">
-                                                {s}
-                                            </SelectItem>
+                                    {imageUrl ? (
+                                        <img src={imageUrl} alt={`${GENDER_LABELS[gender]} ${views[view]}`} className="block h-auto w-full" draggable={false} />
+                                    ) : (
+                                        <div className="flex h-[520px] items-center justify-center rounded bg-muted text-sm text-muted-foreground">
+                                            No body image
+                                        </div>
+                                    )}
+
+                                    {visible.map((h) => {
+                                        const isSelected = h.id === selectedId;
+                                        const color = colorOf(h.status);
+                                        const outline = outlineOf(h);
+                                        return (
+                                            <div
+                                                key={h.id}
+                                                className="pointer-events-none absolute"
+                                                style={{
+                                                    left: `${h.x * 100}%`,
+                                                    top: `${h.y * 100}%`,
+                                                    width: `${h.width * 100}%`,
+                                                    height: `${h.height * 100}%`,
+                                                    transform: `translate(-50%, -50%) rotate(${h.rotation}deg)`,
+                                                    zIndex: isSelected ? 20 : 10,
+                                                }}
+                                            >
+                                                {/* Only the muscle itself takes clicks, so a shape never blocks the body around it. */}
+                                                <svg
+                                                    viewBox="-0.5 -0.5 1 1"
+                                                    preserveAspectRatio="none"
+                                                    className="absolute inset-0 h-full w-full overflow-visible"
+                                                    style={{ mixBlendMode: 'multiply' }}
+                                                >
+                                                    <path
+                                                        d={smoothPath(outline)}
+                                                        fill={color}
+                                                        fillOpacity={0.62}
+                                                        stroke={color}
+                                                        strokeWidth={1}
+                                                        vectorEffect="non-scaling-stroke"
+                                                        className="pointer-events-auto cursor-move"
+                                                        onPointerDown={(e) => {
+                                                            const { x, y } = pointerToNormalized(e);
+                                                            beginInteraction(e, { mode: 'move', id: h.id, offsetX: x - h.x, offsetY: y - h.y });
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <title>{`${h.muscle} · ${statuses[h.status]?.label ?? h.status}`}</title>
+                                                    </path>
+                                                </svg>
+                                                {isSelected && (
+                                                    <>
+                                                        <div className="absolute inset-0 border border-dashed border-sky-500/70" />
+                                                        <span className="absolute -top-3 left-1/2 h-3 w-px -translate-x-1/2 bg-sky-500" />
+                                                        <span
+                                                            onPointerDown={(e) => beginInteraction(e, { mode: 'rotate', id: h.id })}
+                                                            title="Drag to rotate"
+                                                            className="pointer-events-auto absolute -top-5 left-1/2 h-3 w-3 -translate-x-1/2 cursor-grab rounded-full border-2 border-white bg-sky-500 shadow"
+                                                        />
+                                                        <span
+                                                            onPointerDown={(e) => beginInteraction(e, { mode: 'resize', id: h.id })}
+                                                            title="Drag to resize"
+                                                            className="pointer-events-auto absolute -right-1.5 -bottom-1.5 h-3 w-3 cursor-nwse-resize rounded-sm border-2 border-white bg-sky-500 shadow"
+                                                        />
+                                                        {outline.map(([px, py], index) => (
+                                                            <span
+                                                                key={index}
+                                                                onPointerDown={(e) => {
+                                                                    setSelectedPoint(index);
+                                                                    beginInteraction(e, { mode: 'vertex', id: h.id, index });
+                                                                }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                title="Drag to reshape"
+                                                                className={cn(
+                                                                    'pointer-events-auto absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 cursor-crosshair rounded-full border border-white shadow',
+                                                                    selectedPoint === index ? 'bg-amber-400' : 'bg-sky-600',
+                                                                )}
+                                                                style={{ left: `${(px + 0.5) * 100}%`, top: `${(py + 0.5) * 100}%` }}
+                                                            />
+                                                        ))}
+                                                    </>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="mt-3 flex flex-wrap items-center gap-2">
+                                <input
+                                    ref={fileRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) uploadImage(file);
+                                        e.target.value = '';
+                                    }}
+                                />
+                                <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => fileRef.current?.click()}>
+                                    <ImageUp className="h-3.5 w-3.5" /> Upload {GENDER_LABELS[gender].toLowerCase()} {views[view]?.toLowerCase()} image
+                                </Button>
+                                {hasCustomImage && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="h-8 gap-1.5"
+                                        onClick={() => post('/posture-markers/body-image/reset', { gender, view }, 'Body image reset')}
+                                    >
+                                        <RotateCcw className="h-3.5 w-3.5" /> Use default
+                                    </Button>
+                                )}
+                                {isSideView && (
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="ml-auto h-8 gap-1.5"
+                                        disabled={!condition}
+                                        onClick={mirrorToOtherSide}
+                                        title={`Replaces the ${views[otherSide]} highlights with a mirror of this side`}
+                                    >
+                                        <FlipHorizontal2 className="h-3.5 w-3.5" /> Mirror to {views[otherSide]}
+                                    </Button>
+                                )}
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className={cn('h-8 gap-1.5', !isSideView && 'ml-auto')}
+                                    disabled={!condition}
+                                    onClick={copyToOtherGender}
+                                    title="Replaces the other gender's highlights for this condition"
+                                >
+                                    <Copy className="h-3.5 w-3.5" /> Copy to {GENDER_LABELS[gender === 'male' ? 'female' : 'male']}
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* ---------- Inspector ---------- */}
+                    <div className="space-y-5 lg:col-span-2 xl:col-span-1">
+                        {selected ? (
+                            <Card className="gap-3 border-sky-200 py-4 dark:border-sky-900">
+                                <CardHeader className="px-4">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base">Muscle highlight</CardTitle>
+                                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setSelectedId(null)}>
+                                            <X className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-4 px-4">
+                                    <div>
+                                        <Label className="text-xs">Muscle name</Label>
+                                        <Input
+                                            key={selected.id}
+                                            list="muscle-names"
+                                            defaultValue={selected.muscle}
+                                            autoFocus={selected.muscle === 'New muscle'}
+                                            onFocus={(e) => selected.muscle === 'New muscle' && e.target.select()}
+                                            onBlur={(e) => {
+                                                const muscle = e.target.value.trim();
+                                                if (muscle && muscle !== selected.muscle) patchAndSave(selected.id, { muscle });
+                                            }}
+                                            onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                                        />
+                                        <datalist id="muscle-names">
+                                            {muscleSuggestions.map((m) => (
+                                                <option key={m} value={m} />
+                                            ))}
+                                        </datalist>
+                                    </div>
+
+                                    <div>
+                                        <Label className="text-xs">Status</Label>
+                                        <div className="mt-1 grid grid-cols-3 gap-1.5">
+                                            {Object.entries(statuses).map(([key, s]) => (
+                                                <button
+                                                    key={key}
+                                                    type="button"
+                                                    onClick={() => patchAndSave(selected.id, { status: key })}
+                                                    className={cn(
+                                                        'rounded-lg border-2 px-2 py-2 text-xs font-semibold transition-all',
+                                                        selected.status === key ? 'text-white' : 'bg-background',
+                                                    )}
+                                                    style={
+                                                        selected.status === key
+                                                            ? { backgroundColor: s.color, borderColor: s.color }
+                                                            : { color: s.color, borderColor: `${s.color}40` }
+                                                    }
+                                                >
+                                                    {s.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="mt-1 text-[11px] text-muted-foreground">{statuses[selected.status]?.hint}</p>
+                                    </div>
+
+                                    {(
+                                        [
+                                            ['width', 'Width', 0.015, 0.5, 0.005],
+                                            ['height', 'Height', 0.015, 0.5, 0.005],
+                                            ['rotation', 'Rotation', -180, 180, 1],
+                                        ] as const
+                                    ).map(([field, label, min, max, step]) => (
+                                        <div key={field}>
+                                            <div className="flex items-center justify-between">
+                                                <Label className="text-xs">{label}</Label>
+                                                <span className="text-xs text-muted-foreground tabular-nums">
+                                                    {field === 'rotation' ? `${selected.rotation}°` : `${Math.round(selected[field] * 1000) / 10}%`}
+                                                </span>
+                                            </div>
+                                            <input
+                                                type="range"
+                                                min={min}
+                                                max={max}
+                                                step={step}
+                                                value={selected[field]}
+                                                onChange={(e) => patchLocal(selected.id, { [field]: Number(e.target.value) })}
+                                                onPointerUp={() => saveHighlight(localRef.current.find((h) => h.id === selected.id)!)}
+                                                onKeyUp={() => saveHighlight(localRef.current.find((h) => h.id === selected.id)!)}
+                                                className="mt-1 w-full accent-sky-500"
+                                            />
+                                        </div>
+                                    ))}
+
+                                    <div>
+                                        <Label className="text-xs">Outline points</Label>
+                                        <div className="mt-1 flex gap-2">
+                                            <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={addPoint}>
+                                                <Plus className="h-3.5 w-3.5" /> Add point
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="flex-1 gap-1.5"
+                                                disabled={selectedPoint === null || outlineOf(selected).length <= 3}
+                                                onClick={removePoint}
+                                            >
+                                                <X className="h-3.5 w-3.5" /> Remove point
+                                            </Button>
+                                        </div>
+                                        <p className="mt-1 text-[11px] text-muted-foreground">
+                                            Drag the dots on the body to follow the muscle. Click a dot first to add a point after it or remove it.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex gap-2 pt-1">
+                                        <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={mirrorSelected}>
+                                            <FlipHorizontal2 className="h-3.5 w-3.5" /> Copy mirrored
+                                        </Button>
+                                        <Button size="sm" variant="outline" className="gap-1.5 text-destructive" onClick={deleteSelected}>
+                                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <Card className="gap-3 py-4">
+                                <CardHeader className="px-4">
+                                    <CardTitle className="text-base">
+                                        Muscles · {GENDER_LABELS[gender]} {views[view]}
+                                    </CardTitle>
+                                    <CardDescription>Select a muscle to edit it on the body.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3 px-4">
+                                    {muscleRows.length === 0 && (
+                                        <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">
+                                            No muscles on this view yet.
+                                        </p>
+                                    )}
+                                    {Object.entries(statuses).map(([status, s]) => {
+                                        const rows = muscleRows.filter((r) => r.status === status);
+                                        if (!rows.length) return null;
+                                        return (
+                                            <div key={status}>
+                                                <p className="mb-1 text-[11px] font-semibold tracking-wide uppercase" style={{ color: s.color }}>
+                                                    {s.label}
+                                                </p>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {rows.map((r) => (
+                                                        <button
+                                                            key={r.muscle}
+                                                            type="button"
+                                                            onClick={() => setSelectedId(r.ids[0])}
+                                                            className="rounded-full border px-2.5 py-1 text-xs transition-colors hover:bg-muted"
+                                                            style={{ borderColor: `${s.color}55` }}
+                                                        >
+                                                            {r.muscle}
+                                                            {r.ids.length > 1 && <span className="ml-1 text-muted-foreground">×{r.ids.length}</span>}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {condition && (
+                            <Card className="gap-3 py-4">
+                                <CardHeader className="px-4">
+                                    <CardTitle className="text-base">Patient wording</CardTitle>
+                                    <CardDescription>Shown in the app when this condition is detected.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3 px-4">
+                                    <div>
+                                        <Label className="text-xs">Condition name</Label>
+                                        <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">What is it?</Label>
+                                        <Textarea
+                                            rows={3}
+                                            value={draft.description}
+                                            onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Problems the patient may notice (one per line)</Label>
+                                        <Textarea
+                                            rows={4}
+                                            value={draft.effects}
+                                            onChange={(e) => setDraft({ ...draft, effects: e.target.value })}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs">Detect when the assessment is classified as</Label>
+                                        <div className="mt-1 flex flex-wrap gap-1.5">
+                                            {Object.entries(classificationOptions).map(([key, label]) => {
+                                                const on = draft.classifications.includes(key);
+                                                return (
+                                                    <button
+                                                        key={key}
+                                                        type="button"
+                                                        onClick={() =>
+                                                            setDraft({
+                                                                ...draft,
+                                                                classifications: on
+                                                                    ? draft.classifications.filter((k) => k !== key)
+                                                                    : [...draft.classifications, key],
+                                                            })
+                                                        }
+                                                        className={cn(
+                                                            'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
+                                                            on ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted',
+                                                        )}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                        {(condition.detection?.sections?.length ?? 0) > 0 && (
+                                            <p className="mt-2 text-[11px] text-muted-foreground">
+                                                Also detected from measurements:{' '}
+                                                {condition.detection!.sections!.map((s) => s.section).join(', ')}
+                                            </p>
+                                        )}
+                                        {draft.classifications.length === 0 && (condition.detection?.sections?.length ?? 0) === 0 && (
+                                            <p className="mt-2 text-[11px] text-amber-600">
+                                                No detection rule — the app will not show this condition yet.
+                                            </p>
+                                        )}
+                                    </div>
+                                    <label className="flex items-center gap-2 text-sm">
+                                        <Checkbox
+                                            checked={draft.is_active}
+                                            onCheckedChange={(v) => setDraft({ ...draft, is_active: v === true })}
+                                        />
+                                        Show in the app
+                                    </label>
+                                    <div className="flex gap-2 pt-1">
+                                        <Button size="sm" className="flex-1" onClick={saveCondition}>
+                                            Save changes
+                                        </Button>
+                                        <Button size="sm" variant="ghost" className="text-destructive" onClick={() => setDeleteDialog(true)}>
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 pt-1">
+                                        {countsFor(condition, gender).map(({ status, count }) => (
+                                            <Badge key={status} variant="outline" className="gap-1 text-[10px]">
+                                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colorOf(status) }} />
+                                                {count} {statuses[status].label}
+                                            </Badge>
                                         ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">X (0–1)</Label>
-                                <Input
-                                    type="number"
-                                    step="0.001"
-                                    value={draft.x ?? 0}
-                                    onChange={(e) => setDraft({ ...draft, x: Number(e.target.value) })}
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">Y (0–1)</Label>
-                                <Input
-                                    type="number"
-                                    step="0.001"
-                                    value={draft.y ?? 0}
-                                    onChange={(e) => setDraft({ ...draft, y: Number(e.target.value) })}
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">Width</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={draft.width ?? 0.12}
-                                    onChange={(e) => setDraft({ ...draft, width: Number(e.target.value) })}
-                                />
-                            </div>
-                            <div>
-                                <Label className="text-xs">Height</Label>
-                                <Input
-                                    type="number"
-                                    step="0.01"
-                                    value={draft.height ?? 0.12}
-                                    onChange={(e) => setDraft({ ...draft, height: Number(e.target.value) })}
-                                />
-                            </div>
-                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                </div>
+
+                <Dialog open={conditionDialog} onOpenChange={setConditionDialog}>
+                    <DialogContent className="sm:max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle>New condition</DialogTitle>
+                            <DialogDescription>Add the wording and muscles after creating it.</DialogDescription>
+                        </DialogHeader>
+                        <Input
+                            autoFocus
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && createCondition()}
+                            placeholder="e.g. Forward Head Posture"
+                        />
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                            <Button variant="outline" onClick={() => setConditionDialog(false)}>
                                 Cancel
                             </Button>
-                            <Button onClick={submit}>{isEdit ? 'Save Changes' : 'Create Marker'}</Button>
+                            <Button onClick={createCondition}>Create</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={deleteDialog} onOpenChange={setDeleteDialog}>
+                    <DialogContent className="sm:max-w-sm">
+                        <DialogHeader>
+                            <DialogTitle>Delete {condition?.name}?</DialogTitle>
+                            <DialogDescription>
+                                This removes the condition and all of its boy and girl muscle highlights.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setDeleteDialog(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={deleteCondition}>
+                                Delete
+                            </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>

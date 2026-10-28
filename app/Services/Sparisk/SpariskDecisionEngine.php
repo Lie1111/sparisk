@@ -56,7 +56,9 @@ class SpariskDecisionEngine
         $isUnclassified = $primary === null;
 
         $suspected = $candidates->get(0);
-        $secondary = $candidates->get(1);
+        // "Secondary" is the second CONFIRMED pattern when there is one; only
+        // an unclassified assessment falls back to the runner-up suspicion.
+        $secondary = $confirmed->get(1) ?? $candidates->get(1);
 
         $confidence = (float) ($isUnclassified ? ($suspected['confidence'] ?? 0.0) : $primary['confidence']);
 
@@ -117,7 +119,6 @@ class SpariskDecisionEngine
      */
     private function evaluateRule(array $rule, Collection $measurements, float $dataQuality, array $policy, array $gapSections): array
     {
-        $sections = $this->ruleSections($rule);
         $matchedSections = [];
         $levels = [];
 
@@ -178,22 +179,36 @@ class SpariskDecisionEngine
             );
             $matched = $reliable->isNotEmpty()
                 && $measurements->every(fn (PostureMeasurement $m) => $m->alignment_status === 'baseline' || $m->alignment_status === 'normal');
-            $matchedSections = $reliable->keys()->all();
+            // Keyed by section, like every other rule's match map, so the
+            // evidence count and pattern token resolve the parameter correctly.
+            $matchedSections = $reliable->keys()->mapWithKeys(fn (string $section) => [$section => true])->all();
             $levels = ['normal'];
-            $sections = $reliable->keys()->all();
         }
 
-        // A parameter that is a structural Evidence Gap (no approved Level 1 /
-        // Level 2 reference for this patient's age) can never carry a deviation,
-        // so it must not dilute the rule's confidence.
-        $expected = array_values(array_filter(
-            $sections,
-            fn (string $section) => !in_array($section, $gapSections, true)
-        ));
+        // Evidence is counted per INDEPENDENT parameter, never per row: C4 and
+        // D4 are one pelvic parameter seen from two sides, so a single bad
+        // reading can never supply two pieces of evidence.
+        $derived = config('sparisk.derived_sections', []);
+        $matchedParameters = collect(array_keys($matchedSections))
+            ->reject(fn (string $section) => in_array($section, $derived, true))
+            ->map(fn (string $section) => $this->parameterKey($section))
+            ->unique()
+            ->values();
+        $evidence = $matchedParameters->count();
 
-        $evidence = count($matchedSections);
-        $coverage = $expected === [] ? 1.0 : $evidence / count($expected);
-        $confidence = round(min(100.0, $coverage * 100) * $dataQuality, 1);
+        // How much evidence the rule actually needs: its mandatory criteria
+        // plus one supporting criterion, never fewer than the policy minimum.
+        $mandatory = collect($rule['requires'] ?? [])
+            ->merge(collect($rule['all'] ?? [])->pluck('section')->all())
+            ->reject(fn (string $section) => in_array($section, $derived, true))
+            ->reject(fn (string $section) => in_array($section, $gapSections, true))
+            ->map(fn (string $section) => $this->parameterKey($section))
+            ->unique()
+            ->count();
+        $hasOptional = !empty($rule['any']) || !empty($rule['any2']);
+        $required = max((int) $policy['min_evidence'], $mandatory + ($hasOptional ? 1 : 0));
+        $coverage = min(1.0, $evidence / max(1, $required));
+        $confidence = round($coverage * 100 * $dataQuality, 1);
 
         $confirmable = in_array($rule['classification'], config('sparisk.confirmable_classifications', []), true);
 
@@ -201,18 +216,23 @@ class SpariskDecisionEngine
         if ($matched) {
             $confirmed = $confirmable
                 && $missing === []
-                && $evidence >= $policy['min_evidence']
+                && $evidence >= $required
                 && $confidence >= $policy['min_confidence']
                 && $dataQuality >= $policy['min_data_quality'];
 
             $status = $confirmed ? 'confirmed' : 'suspected';
+        } elseif (! $nonePass) {
+            // A rule whose exclusion criterion matched describes a DIFFERENT
+            // pattern (e.g. Flatback is excluded by an above-target thoracic
+            // curve), so it may not even be reported as a suspicion.
+            $status = 'not_matched';
         } elseif ($missing !== []) {
             $status = 'insufficient_data';
-        } elseif ($hasConditions && $allPass && $evidence > 0) {
-            // The mandatory criteria of the pattern were met but its supporting
-            // criteria were not, so the pattern can only be reported as a
-            // suspicion. When `all` fails the pattern's core criteria are not
-            // satisfied at all and it is not a candidate.
+        } elseif ($hasConditions && $allPass && $anyPass && $any2Pass && $evidence > 0) {
+            // The mandatory criteria of the pattern were met but a supporting
+            // group was not, so the pattern can only be reported as a
+            // suspicion. When a required group fails (all/any/any2) the
+            // pattern's core criteria are not satisfied at all.
             $status = 'suspected';
         }
 
@@ -224,8 +244,9 @@ class SpariskDecisionEngine
             'matched' => $matched,
             'confirmable' => $confirmable,
             'evidence' => $evidence,
-            'expected_evidence' => count($expected),
-            'matched_sections' => array_values($matchedSections),
+            'expected_evidence' => $required,
+            'matched_sections' => array_keys($matchedSections),
+            'matched_parameters' => $matchedParameters->all(),
             'missing_sections' => $missing,
             'confidence' => $confidence,
             'level' => $this->worstLevel($levels),
@@ -302,20 +323,14 @@ class SpariskDecisionEngine
     }
 
     /**
-     * Every distinct section a rule can look at, used to score how complete the
-     * evidence for that rule is.
+     * The independent parameter a section belongs to.
+     *
+     * C4/D4, C5/D5 and A1/B1 are the same anatomical parameter measured from
+     * different views; they must count once when a rule is scored.
      */
-    private function ruleSections(array $rule): array
+    private function parameterKey(string $section): string
     {
-        $sections = $rule['requires'] ?? [];
-
-        foreach (['all', 'any', 'any2', 'none'] as $group) {
-            foreach ($rule[$group] ?? [] as $condition) {
-                $sections[] = $condition['section'];
-            }
-        }
-
-        return array_values(array_unique($sections));
+        return (string) config("sparisk.section_parameters.{$section}", $section);
     }
 
     private function worstLevel(array $levels): ?string
@@ -338,6 +353,13 @@ class SpariskDecisionEngine
      */
     private function side(Collection $measurements, array $sections): ?string
     {
+        $parameters = collect($sections)->map(fn (string $section) => $this->parameterKey($section));
+        $midline = config('sparisk.midline_parameters', []);
+
+        if ($parameters->isNotEmpty() && $parameters->every(fn (string $p) => in_array($p, $midline, true))) {
+            return null;
+        }
+
         $sides = [];
         foreach ($sections as $section) {
             $measurement = $measurements->get($section);

@@ -54,7 +54,10 @@ class PostureSettingSeeder extends Seeder
         ['B5', 'Trunk Alignment',         [0, 0, 0, 0, 0], 'Midline'],
         ['B6', 'Pelvic Tilt / Obliquity', [0, 0, 0, 0, 0], 'Pelvis level'],
         ['B7', 'Knee Alignment',          [0, 0, 0, 0, 0], 'Neutral'],
-        ['B8', 'Feet Alignment',          [0, 0, 0, 0, 0], 'Neutral rear-foot alignment'],
+        // B8 uses the same forward-axis foot progression measurement as
+        // A10/A11, so it takes the same external-progression reference instead
+        // of 0°. The old ankle→heel reading measured foot anatomy (~47°).
+        ['B8', 'Feet Alignment',          [5, 7, 7, 7, 8], 'External foot progression'],
     ];
 
     /**
@@ -77,6 +80,12 @@ class PostureSettingSeeder extends Seeder
         // duplicates that shadow the real reference. Drop them first and let
         // the seeders below rebuild every parameter with sex = NULL.
         PostureSetting::where('sex', '')->delete();
+
+        // C4/D4 used to resolve a sex-specific published pelvic-tilt norm. The
+        // measured axis is the hip-over-ankle plumb, so the sex rows no longer
+        // apply; leaving them behind would make the engine prefer the stale
+        // 12.6°/14.7° values over the definitional neutral below.
+        PostureSetting::whereIn('section', ['C4', 'D4'])->whereNotNull('sex')->delete();
 
         $this->seedNeutralReferences();
         $this->seedReferenceTable();

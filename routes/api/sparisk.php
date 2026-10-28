@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AcademyController;
 use App\Http\Controllers\Api\BmiController;
 use App\Http\Controllers\Api\HealthScreeningController;
+use App\Http\Controllers\Api\MuscleMapController;
 use App\Http\Controllers\Api\PatientController;
 use App\Http\Controllers\Api\PostureAssessmentController;
 use App\Http\Controllers\Api\PostureMarkerController;
@@ -50,6 +51,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Posture Markers - body character overlay markers
     Route::get('posture-markers', [PostureMarkerController::class, 'index']);
+
+    // Muscle Map - detected conditions with weak / tight muscle highlights
+    Route::get('muscle-map', [MuscleMapController::class, 'index']);
+    Route::get('assessments/{postureAssessment}/muscle-map', [MuscleMapController::class, 'forAssessment']);
+    Route::get('assessments/{postureAssessment}/program', [MuscleMapController::class, 'program']);
 
     // Progress Tracking
     Route::post('progress/compare', [ProgressController::class, 'compare']);

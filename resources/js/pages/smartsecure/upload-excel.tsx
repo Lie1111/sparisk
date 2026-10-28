@@ -1,6 +1,6 @@
 import { useCallback } from "react"
 import { useDropzone } from "react-dropzone"
-import readXlsxFile from "read-excel-file"
+import readXlsxFile from "read-excel-file/browser"
 import { Table, TableHeader, TableBody, TableCell, TableRow, TableHead } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"

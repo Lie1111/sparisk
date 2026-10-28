@@ -53,6 +53,10 @@ class SpariskInterpretationEngine
                     'reference_source' => $m->reference_source,
                     'reference_level' => $m->reference_level,
                     'tolerance' => $this->measurementEngine->toleranceFor($m),
+                    // The shared axis/landmarks/sign convention for this
+                    // measurement, so the app never describes a reading
+                    // differently from the engine.
+                    'definition' => $this->measurementEngine->definitionFor((string) $m->section),
                     'age_group' => $m->age_group,
                     'sex_if_required' => $m->sex_if_required,
                     'posture_classification' => $m->posture_classification,
@@ -97,6 +101,7 @@ class SpariskInterpretationEngine
                     'reference_source' => $details['reference_source'] ?? $m->reference_source,
                     'reference_level' => $details['reference_level'] ?? $m->reference_level,
                     'tolerance' => $details['tolerance'] ?? $this->measurementEngine->toleranceFor($m),
+                    'definition' => $details['definition'] ?? $this->measurementEngine->definitionFor((string) $m->section),
                     'age_group' => $details['age_group'] ?? $m->age_group,
                     'sex_if_required' => $details['sex_if_required'] ?? $m->sex_if_required,
                     'position_note' => $details['position_note'] ?? $m->position_note,
@@ -145,6 +150,14 @@ class SpariskInterpretationEngine
             'display' => $isUnclassified
                 ? $unclassified['display']
                 : $this->patternLabel($assessment->posture_classification),
+            'primary_label' => $isUnclassified
+                ? null
+                : $this->patternLabel($assessment->posture_classification),
+            // The Main Finding is the CONFIRMED primary classification, never
+            // the suspected pattern. The suspected pattern is reported
+            // separately so a single uncertain/incorrect parameter can no longer
+            // appear as the main diagnosis (@see FLATBACK regression).
+            'main_finding' => $this->mainFinding($assessment, $isUnclassified),
             'review_status' => $assessment->review_status,
             'review_required' => $isUnclassified,
             'suspected_pattern' => $assessment->suspected_pattern,
@@ -160,6 +173,27 @@ class SpariskInterpretationEngine
             'explanation' => $isUnclassified ? $this->unclassifiedExplanation($assessment) : null,
             'classifications' => $this->enrichClassifications($assessment),
         ];
+    }
+
+    /**
+     * The sentence shown as the report's Main Finding.
+     *
+     * A confirmed assessment uses the primary classification's clinical
+     * conclusion; an unclassified assessment can only state the suspected
+     * pattern, because nothing has been confirmed.
+     */
+    private function mainFinding(PostureAssessment $assessment, bool $isUnclassified): ?string
+    {
+        if ($isUnclassified) {
+            return $this->patternTokenLabel($assessment->suspected_pattern);
+        }
+
+        $primary = $assessment->classifications()
+            ->where('classification_type', 'primary')
+            ->first();
+
+        return $primary?->description
+            ?: $this->patternLabel($assessment->posture_classification);
     }
 
     /**

@@ -10,7 +10,7 @@ class PostureAssessment extends Model
 {
     protected $fillable = [
         'patient_id', 'health_screening_id', 'skill_assessment_id', 'assessment_date',
-        'time_mark', 'overall_score', 'overall_status',
+        'time_mark', 'measurement_version', 'overall_score', 'overall_status',
         'posture_classification', 'review_status',
         'suspected_pattern', 'secondary_pattern', 'asymmetry_flag',
         'confidence_level', 'clinical_summary', 'patient_problem',

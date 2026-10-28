@@ -71,6 +71,62 @@ class SpariskReportPdfService
     /** Usable width inside the A4 page margins (595.28 - 38 - 38 pt). */
     private const CONTENT_WIDTH = 519.0;
 
+    /**
+     * Square crops printed beside each Primary Finding.
+     *
+     * A finding that only names a body region ("Upper Back Curve") still leaves
+     * the reader guessing where on the photo it was measured. These crops are
+     * cut from the same capture the measurement used, around the landmark chain
+     * that defines the angle, so the row points at the body part it describes.
+     *
+     * `points` are MediaPipe landmark indices; `pad` widens the box so the joint
+     * is not cropped at its edge.
+     */
+    private const FINDING_CROPS = [
+        // Side profiles — sagittal plumb / curve measurements.
+        'C1' => ['right_side', [8, 24, 28], 0.18],
+        'C2' => ['right_side', [8, 12], 0.30],
+        'C3' => ['right_side', [12, 24], 0.20],
+        'C4' => ['right_side', [24, 28], 0.18],
+        'C5' => ['right_side', [24, 26, 28], 0.14],
+        'C6' => ['right_side', [26, 28], 0.22],
+        'C7' => ['right_side', [28, 32], 0.22],
+        'D1' => ['left_side', [7, 23, 27], 0.18],
+        'D2' => ['left_side', [7, 11], 0.30],
+        'D3' => ['left_side', [11, 23], 0.20],
+        'D4' => ['left_side', [23, 27], 0.18],
+        'D5' => ['left_side', [23, 25, 27], 0.14],
+        'D6' => ['left_side', [25, 27], 0.22],
+        'D7' => ['left_side', [27, 31], 0.22],
+        'side_cva' => ['right_side', [8, 12], 0.30],
+        'side_kyphosis' => ['right_side', [8, 12, 24], 0.16],
+        'side_lordosis' => ['right_side', [12, 24, 26], 0.16],
+        // Front view.
+        'A1' => ['front', [0, 27, 28], 0.12],
+        'A2' => ['front', [2, 5], 0.55],
+        'A3' => ['front', [11, 12], 0.28],
+        'A4' => ['front', [11, 12, 23, 24], 0.14],
+        'A5' => ['front', [11, 12, 23, 24], 0.14],
+        'A6' => ['front', [11, 12, 27, 28], 0.12],
+        'A7' => ['front', [23, 24], 0.30],
+        'A8' => ['front', [24, 26, 28], 0.16],
+        'A9' => ['front', [23, 25, 27], 0.16],
+        'A10' => ['front', [28, 32], 0.22],
+        'A11' => ['front', [27, 31], 0.22],
+        // Back view.
+        'B1' => ['back', [0, 27, 28], 0.12],
+        'B2' => ['back', [7, 8], 0.55],
+        'B3' => ['back', [11, 12], 0.28],
+        'B4' => ['back', [11, 12, 23, 24], 0.14],
+        'B5' => ['back', [11, 12, 27, 28], 0.12],
+        'B6' => ['back', [23, 24], 0.30],
+        'B7' => ['back', [25, 26, 27, 28], 0.14],
+        'B8' => ['back', [27, 28, 31, 32], 0.20],
+    ];
+
+    /** Rendered size of a finding crop (px); printed at 84px, so 260 is ample. */
+    private const FINDING_CROP_PX = 260;
+
     /** Label width, the gap before a leader line, and the dot that ends it (pt). */
     private const LABEL_WIDTH = 52.0;
 
@@ -761,7 +817,8 @@ class SpariskReportPdfService
         $lines = array_filter([
             $overall['summary'] ?? null,
             $assessment->clinical_summary,
-            $classification['suspected_pattern_label'] ? 'Main finding: '.$classification['suspected_pattern_label'].'.' : null,
+            $classification['main_finding'] ? 'Main finding: '.$classification['main_finding'] : null,
+            $classification['suspected_pattern_label'] ? 'Suspected pattern: '.$classification['suspected_pattern_label'].'.' : null,
             $classification['secondary_pattern_label'] ? 'Secondary finding: '.$classification['secondary_pattern_label'].'.' : null,
             $classification['asymmetry_flag'] ? 'Left/right asymmetry detected.' : 'No marked left/right asymmetry detected.',
         ]);
@@ -856,6 +913,10 @@ class SpariskReportPdfService
                         // Off Point bands are built from, so a reader can check
                         // the status against the cut-off it was judged on.
                         'tolerance' => $tolerance !== null ? $this->formatDecimal($tolerance) : null,
+                        // The shared axis/landmarks/sign convention so a reader
+                        // can confirm the measured angle and the reference use
+                        // the same definition.
+                        'definition' => $this->measurementEngine->definitionFor((string) $m->section),
                         'deviation' => $deviation !== null ? $this->formatSignedDecimal($deviation) : null,
                         'reference_level' => $levelMeta['label'] ?? null,
                         'is_baseline' => $m->reference_level === 'individual_baseline',
@@ -1602,7 +1663,7 @@ class SpariskReportPdfService
     {
         $findings = $this->interpreter->generatePrimaryFindings($assessment);
 
-        return array_map(function (array $finding) use ($statuses) {
+        return array_map(function (array $finding) use ($assessment, $statuses) {
             $statusMeta = $statuses[$finding['alignment_status']] ?? $statuses['normal'];
 
             return [
@@ -1611,8 +1672,203 @@ class SpariskReportPdfService
                 'status' => $statusMeta['label'],
                 'color' => self::STATUS_HEX[$statusMeta['color']] ?? self::STATUS_HEX['grey'],
                 'note' => $finding['interpretation'] ?: $finding['position_note'],
+                // A square crop of the body area the finding points at, so the
+                // reader does not have to guess where on the photo it was
+                // measured. NULL when the capture or landmarks are missing.
+                'crop' => $this->findingCrop($assessment, (string) $finding['section']),
             ];
         }, $findings);
+    }
+
+    /**
+     * Square crop of one body region, cut from the capture that measurement
+     * used, as a JPEG data URI.
+     *
+     * The box is built from the MediaPipe landmarks of the chain that defines
+     * the angle, expanded until it is square (so the thumbnail is not distorted)
+     * and padded so the joint is not cut at its edge. Every step is clamped to
+     * the photo, and any missing piece (no capture, no landmarks, no GD)
+     * returns NULL so the table simply drops the column for that row.
+     */
+    private function findingCrop(PostureAssessment $assessment, string $section): ?string
+    {
+        [$view, $indices, $pad] = self::FINDING_CROPS[$section] ?? [null, [], 0.0];
+
+        if ($view === null || $indices === [] || ! function_exists('imagecreatefromstring')) {
+            return null;
+        }
+
+        $image = $assessment->images->where('view', $view)->sortBy('order_index')->last();
+
+        if (! $image || ! $image->image_path || ! Storage::disk('public')->exists($image->image_path)) {
+            return null;
+        }
+
+        $landmarks = (array) ($image->landmarks ?? []);
+        $points = [];
+
+        foreach ($indices as $index) {
+            $point = $landmarks[$index] ?? null;
+            if ($point === null || ! isset($point['x'], $point['y'])) {
+                continue;
+            }
+            if (((float) ($point['visibility'] ?? 1.0)) < 0.3) {
+                continue;
+            }
+            $points[] = [(float) $point['x'], (float) $point['y']];
+        }
+
+        if (count($points) < 2) {
+            return null;
+        }
+
+        $source = @imagecreatefromstring(Storage::disk('public')->get($image->image_path));
+
+        if ($source === false) {
+            return null;
+        }
+
+        $width = imagesx($source);
+        $height = imagesy($source);
+
+        $xs = array_column($points, 0);
+        $ys = array_column($points, 1);
+
+        $minX = min($xs) * $width;
+        $maxX = max($xs) * $width;
+        $minY = min($ys) * $height;
+        $maxY = max($ys) * $height;
+
+        // Square the box around its centre, then pad, then clamp to the photo.
+        $side = max($maxX - $minX, $maxY - $minY) * (1 + ($pad * 2));
+        $side = max($side, 24.0);
+
+        $centreX = ($minX + $maxX) / 2;
+        $centreY = ($minY + $maxY) / 2;
+
+        $left = (int) round($centreX - ($side / 2));
+        $top = (int) round($centreY - ($side / 2));
+        $size = (int) round($side);
+
+        if ($left < 0) {
+            $size += $left;
+            $left = 0;
+        }
+        if ($top < 0) {
+            $size += $top;
+            $top = 0;
+        }
+        $size = min($size, $width - $left, $height - $top);
+
+        if ($size < 8) {
+            imagedestroy($source);
+
+            return null;
+        }
+
+        $crop = imagecrop($source, [
+            'x' => $left,
+            'y' => $top,
+            'width' => $size,
+            'height' => $size,
+        ]);
+
+        imagedestroy($source);
+
+        if ($crop === false) {
+            return null;
+        }
+
+        $canvas = imagecreatetruecolor(self::FINDING_CROP_PX, self::FINDING_CROP_PX);
+        imagecopyresampled($canvas, $crop, 0, 0, 0, 0, self::FINDING_CROP_PX, self::FINDING_CROP_PX, $size, $size);
+        imagedestroy($crop);
+
+        // Draw the reference plumb and the measured landmark chain on top, so
+        // the reader can see which points the angle was built from.
+        $this->annotateFindingCrop($canvas, $points, $left, $top, $size, $width, $height);
+
+        ob_start();
+        imagejpeg($canvas, null, 82);
+        $jpeg = (string) ob_get_clean();
+        imagedestroy($canvas);
+
+        return $jpeg === '' ? null : 'data:image/jpeg;base64,'.base64_encode($jpeg);
+    }
+
+    /**
+     * Draw the measurement geometry on a finding crop.
+     *
+     * A bare photo crop still leaves the reader guessing which points were
+     * used. This paints the same two things the full-plate overlay uses, in the
+     * same colours the report legend already explains:
+     *
+     *   green dashed  — the vertical plumb line through the base landmark, i.e.
+     *                   the reference the deviation is measured against
+     *   blue line     — the measured landmark chain (the "bone segment")
+     *   blue pins     — the landmarks the angle is built from, ringed in white
+     *                   so they stay visible against skin and clothing
+     *
+     * @param  array<int, array{0: float, 1: float}>  $points  normalised (0..1) source coords
+     */
+    private function annotateFindingCrop(
+        \GdImage $canvas,
+        array $points,
+        int $left,
+        int $top,
+        int $size,
+        int $sourceWidth,
+        int $sourceHeight,
+    ): void {
+        $px = self::FINDING_CROP_PX;
+
+        $toCanvas = function (array $point) use ($left, $top, $size, $sourceWidth, $sourceHeight, $px): array {
+            $x = (($point[0] * $sourceWidth) - $left) / $size * $px;
+            $y = (($point[1] * $sourceHeight) - $top) / $size * $px;
+
+            return [$x, $y];
+        };
+
+        $mapped = array_map($toCanvas, $points);
+        $base = end($mapped);
+
+        // Annotation sizes are proportional to the canvas so the pins and lines
+        // stay readable whether the crop is rendered at 200px or larger.
+        $scale = $px / 200;
+
+        $green = imagecolorallocate($canvas, 46, 204, 64);
+        $blue = imagecolorallocate($canvas, 37, 99, 235);
+        $white = imagecolorallocate($canvas, 255, 255, 255);
+
+        // Green plumb through the base landmark (dashed, like the plate).
+        $dash = (int) round(7 * $scale);
+        for ($y = 0; $y < $px; $y += $dash * 2) {
+            imageline($canvas, (int) $base[0], $y, (int) $base[0], min($px - 1, $y + $dash), $green);
+        }
+
+        // Blue measured chain, drawn as a white-edged strip so it reads on any
+        // background.
+        imagesetthickness($canvas, (int) round(5 * $scale));
+        foreach (array_slice($mapped, 0, -1) as $i => $start) {
+            $end = $mapped[$i + 1];
+            imageline($canvas, (int) $start[0], (int) $start[1], (int) $end[0], (int) $end[1], $white);
+        }
+        imagesetthickness($canvas, (int) round(3 * $scale));
+        foreach (array_slice($mapped, 0, -1) as $i => $start) {
+            $end = $mapped[$i + 1];
+            imageline($canvas, (int) $start[0], (int) $start[1], (int) $end[0], (int) $end[1], $blue);
+        }
+        imagesetthickness($canvas, 1);
+
+        // Pins: white halo, blue core.
+        $halo = (int) round(15 * $scale);
+        $core = (int) round(9 * $scale);
+        foreach ($mapped as $point) {
+            $x = (int) round($point[0]);
+            $y = (int) round($point[1]);
+
+            imagefilledellipse($canvas, $x, $y, $halo, $halo, $white);
+            imagefilledellipse($canvas, $x, $y, $core, $core, $blue);
+        }
     }
 
     /**

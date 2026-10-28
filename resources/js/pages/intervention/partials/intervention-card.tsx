@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Clock, ImageIcon, Pencil, Repeat, Trash2, ZoomIn } from 'lucide-react';
 import { useState } from 'react';
-import { LEVEL_ACCENT, programIcon, type Intervention } from './hooks';
+import { LEVEL_ACCENT, PROGRAM_DOT, WEEKDAYS, dayShort, programIcon, type Intervention } from './hooks';
 
 export default function InterventionCard({
     item,
@@ -94,6 +94,22 @@ export default function InterventionCard({
                             <Clock className="h-3 w-3" /> {item.duration_minutes} min
                         </span>
                     )}
+                </div>
+
+                <div className="mt-2 flex gap-1" title="Days in the weekly program">
+                    {WEEKDAYS.map((day) => {
+                        const on = (item.days ?? []).includes(day);
+                        return (
+                            <span
+                                key={day}
+                                className={`w-9 rounded-md py-0.5 text-center text-[10px] font-semibold ${
+                                    on ? `${PROGRAM_DOT[item.program] ?? 'bg-primary'} text-white` : 'bg-muted text-muted-foreground/60'
+                                }`}
+                            >
+                                {dayShort(day)}
+                            </span>
+                        );
+                    })}
                 </div>
             </div>
 

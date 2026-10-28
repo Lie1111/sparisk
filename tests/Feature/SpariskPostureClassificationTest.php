@@ -63,6 +63,9 @@ it('flags a measurement that cannot be normalised for review instead of scoring 
 });
 
 it('returns UNCLASSIFIED with measurement review required when the pattern is not confirmable', function () {
+    // C4 and D4 are the SAME pelvic parameter seen from both sides. They may
+    // not supply two independent pieces of evidence, so a single pelvic
+    // reading can only make Flatback a suspicion — never a confirmation.
     $assessment = sparisk_assessment([
         'A1' => 0.5, 'A2' => 0.4, 'A3' => 6.0, 'A4' => 0.5, 'A5' => 0.5, 'A6' => 0.5,
         'A7' => 0.8, 'A8' => -7.0, 'A9' => -1.0, 'A10' => 3.0, 'A11' => -3.0,
@@ -76,10 +79,15 @@ it('returns UNCLASSIFIED with measurement review required when the pattern is no
     expect($result['posture_classification'])->toBe('UNCLASSIFIED')
         ->and($result['posture_classification_display'])->toBe('Unclassified – Measurement Review Required')
         ->and($result['review_status'])->toBe('MEASUREMENT_REVIEW_REQUIRED')
-        ->and($result['suspected_pattern'])->toBe('RIGHT_FLEXED_KNEE')
-        ->and($result['secondary_pattern'])->toBe('MILD_FORWARD_SHOULDER')
+        ->and($result['suspected_pattern'])->toBe('MODERATE_FLAT_BACK')
+        ->and($result['secondary_pattern'])->toBe('RIGHT_FLEXED_KNEE')
         ->and($result['asymmetry_flag'])->toBeTrue()
         ->and($result['confidence_level'])->toBe('LOW');
+
+    // The two side rows collapse to one parameter in the evidence count.
+    $flatback = collect($result['decisions'])->firstWhere('rule_id', 'FLATBACK');
+    expect($flatback['evidence'])->toBe(1)
+        ->and($flatback['status'])->toBe('suspected');
 
     expect($assessment->fresh()->posture_classification)->toBe('UNCLASSIFIED')
         ->and($assessment->fresh()->review_status)->toBe('MEASUREMENT_REVIEW_REQUIRED');

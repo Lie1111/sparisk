@@ -13,6 +13,8 @@ export type Intervention = {
     description: string | null;
     sets_reps: string | null;
     frequency: string | null;
+    /** Weekdays the item runs on (monday..sunday). */
+    days: string[] | null;
     duration_minutes: number | null;
     image_path: string | null;
     image_url: string | null;
@@ -32,6 +34,7 @@ export type InterventionFormData = {
     description: string;
     sets_reps: string;
     frequency: string;
+    days: string[];
     duration_minutes: string;
     image_url: string;
 };
@@ -51,6 +54,29 @@ export const PROGRAM_ACCENT: Record<string, string> = {
     massage_therapy: 'bg-amber-50 text-amber-600',
     general_exercise: 'bg-violet-50 text-violet-600',
 };
+
+/** Solid colour per program, used for the weekly program blocks. */
+export const PROGRAM_DOT: Record<string, string> = {
+    aquatic_exercise: 'bg-sky-500',
+    massage_therapy: 'bg-amber-500',
+    general_exercise: 'bg-violet-500',
+};
+
+export const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+export const dayShort = (day: string) => day.slice(0, 3).replace(/^\w/, (c) => c.toUpperCase());
+
+/** One-click day patterns offered in the form. */
+export const DAY_PRESETS: { label: string; days: string[] }[] = [
+    { label: 'Daily', days: WEEKDAYS },
+    { label: 'Mon · Wed · Fri', days: ['monday', 'wednesday', 'friday'] },
+    { label: 'Tue · Thu · Sat', days: ['tuesday', 'thursday', 'saturday'] },
+    { label: 'Weekdays', days: WEEKDAYS.slice(0, 5) },
+];
+
+/** Frequency wording that matches the picked days. */
+export const frequencyFor = (days: string[]) =>
+    days.length === 7 ? 'Daily' : days.length === 0 ? '' : `${days.length}x per week`;
 
 export const LEVEL_ACCENT: Record<string, string> = {
     beginner: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -73,6 +99,7 @@ export const emptyInterventionForm = (
     description: '',
     sets_reps: '',
     frequency: '',
+    days: [],
     duration_minutes: '',
     image_url: '',
 });
@@ -88,6 +115,7 @@ export const formFromIntervention = (item: Intervention): InterventionFormData =
     description: item.description ?? '',
     sets_reps: item.sets_reps ?? '',
     frequency: item.frequency ?? '',
+    days: item.days ?? [],
     duration_minutes: item.duration_minutes !== null ? String(item.duration_minutes) : '',
     image_url: item.image_url ?? '',
 });

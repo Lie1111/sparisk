@@ -33,6 +33,7 @@ class DatabaseSeeder extends Seeder
             InterventionSeeder::class,
             PostureMarkerSeeder::class,
             SataPostureMarkerSeeder::class,
+            MuscleMapSeeder::class,
         ]);
     }
 }

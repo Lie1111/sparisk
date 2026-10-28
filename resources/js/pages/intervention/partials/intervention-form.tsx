@@ -2,10 +2,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { ImageIcon, Link2, Trash2, Upload } from 'lucide-react';
+import { CalendarDays, ImageIcon, Link2, Trash2, Upload } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { LEVEL_ACCENT, programIcon, type InterventionFormData } from './hooks';
+import { DAY_PRESETS, LEVEL_ACCENT, WEEKDAYS, dayShort, frequencyFor, programIcon, type InterventionFormData } from './hooks';
 
 /** Sentinel because Radix Select forbids an empty-string item value. */
 const NO_LEVEL = 'none';
@@ -23,7 +23,7 @@ export default function InterventionForm({
     currentImage,
 }: {
     data: InterventionFormData;
-    setData: (key: keyof InterventionFormData, value: any) => void;
+    setData: (key: keyof InterventionFormData, value: unknown) => void;
     errors?: Record<string, string>;
     categories: Record<string, string>;
     programs?: Record<string, string>;
@@ -34,7 +34,7 @@ export default function InterventionForm({
     /** Image already saved on the row, shown when nothing new is picked. */
     currentImage?: string | null;
 }) {
-    const fieldError = (key: string) => (errors as any)?.[key];
+    const fieldError = (key: string) => errors?.[key];
 
     const fileInput = useRef<HTMLInputElement>(null);
     const [objectUrl, setObjectUrl] = useState<string | null>(null);
@@ -50,6 +50,15 @@ export default function InterventionForm({
         setObjectUrl(url);
         return () => URL.revokeObjectURL(url);
     }, [imageFile]);
+
+    // Picking days keeps the frequency wording in step with them.
+    const setDays = (days: string[]) => {
+        const ordered = WEEKDAYS.filter((d) => days.includes(d));
+        setData('days', ordered);
+        setData('frequency', frequencyFor(ordered));
+    };
+    const toggleDay = (day: string) =>
+        setDays(data.days.includes(day) ? data.days.filter((d) => d !== day) : [...data.days, day]);
 
     const preview = objectUrl ?? data.image_url ?? currentImage ?? null;
     const isMassage = data.program === 'massage_therapy';
@@ -144,7 +153,7 @@ export default function InterventionForm({
                     <Input
                         value={data.frequency}
                         onChange={(e) => setData('frequency', e.target.value)}
-                        placeholder="3x per week"
+                        placeholder="Set from the days below"
                     />
                 </div>
                 <div>
@@ -160,6 +169,43 @@ export default function InterventionForm({
                         <p className="text-xs text-red-500">{fieldError('duration_minutes')}</p>
                     )}
                 </div>
+            </div>
+
+            <div>
+                <Label className="flex items-center gap-1.5">
+                    <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" /> Days in the weekly program
+                </Label>
+                <div className="mt-2 grid grid-cols-7 gap-1.5">
+                    {WEEKDAYS.map((day) => {
+                        const on = data.days.includes(day);
+                        return (
+                            <button
+                                key={day}
+                                type="button"
+                                onClick={() => toggleDay(day)}
+                                className={`rounded-lg border py-2 text-xs font-semibold transition-colors ${
+                                    on ? 'border-primary bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'
+                                }`}
+                            >
+                                {dayShort(day)}
+                            </button>
+                        );
+                    })}
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-muted-foreground">Quick pick:</span>
+                    {DAY_PRESETS.map((preset) => (
+                        <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() => setDays(preset.days)}
+                            className="rounded-full border px-2.5 py-0.5 text-[11px] hover:bg-muted"
+                        >
+                            {preset.label}
+                        </button>
+                    ))}
+                </div>
+                {fieldError('days') && <p className="text-xs text-red-500">{fieldError('days')}</p>}
             </div>
 
             <div className="rounded-lg border bg-muted/30 p-4">

@@ -45,6 +45,7 @@ class PostureAssessmentController extends Controller
             'assessment_date' => 'required|date',
             'health_screening_id' => 'nullable|exists:health_screenings,id',
             'skill_assessment_id' => 'nullable|exists:skill_assessments,id',
+            'measurement_version' => 'nullable|integer|in:1,2',
             'measurements' => 'required|array',
             'measurements.*.section' => 'required|string',
             'measurements.*.value' => 'required|numeric',
@@ -66,6 +67,11 @@ class PostureAssessmentController extends Controller
                 'skill_assessment_id' => $request->skill_assessment_id,
                 'assessment_date' => $request->assessment_date,
                 'time_mark' => $timeMark,
+                // Version 2 = side-view signs resolved to the anatomical front
+                // and B8 measured on the foot-progression axis. An older app
+                // build omits the field and is stored as version 1 so its raw
+                // signs can be corrected by `posture:recompute`.
+                'measurement_version' => (int) ($request->input('measurement_version') ?? 1),
             ]);
 
             $landmarks = collect($request->measurements)->mapWithKeys(fn($m) => [
@@ -124,7 +130,15 @@ class PostureAssessmentController extends Controller
             $this->syncInterventionImages($assessment);
 
             return response()->json([
-                'assessment' => $assessment,
+                // Enrich the embedded assessment the same way the detail
+                // endpoint does, so the app's result screen shows the
+                // tolerance, definition and Main Finding immediately after the
+                // capture instead of only after a reload.
+                'assessment' => array_merge($assessment->toArray(), [
+                    'measurements' => $interpretations,
+                    'classifications' => $this->interpretationEngine->enrichClassifications($assessment),
+                    'classification' => $this->interpretationEngine->classificationSummary($assessment),
+                ]),
                 'decision_result' => $decisionResult,
                 'global_analysis' => $globalAnalysis,
                 'patient_problem' => $patientProblem,

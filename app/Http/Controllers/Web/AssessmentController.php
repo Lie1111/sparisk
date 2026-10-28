@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AssessmentImage;
 use App\Models\PostureAssessment;
 use App\Services\Sparisk\SpariskInterpretationEngine;
+use App\Services\Sparisk\SpariskMeasurementEngine;
 use App\Services\Sparisk\SpariskReportPdfService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +14,10 @@ use Inertia\Inertia;
 
 class AssessmentController extends Controller
 {
-    public function __construct(private SpariskInterpretationEngine $interpretationEngine) {}
+    public function __construct(
+        private SpariskInterpretationEngine $interpretationEngine,
+        private SpariskMeasurementEngine $measurementEngine,
+    ) {}
 
     public function show(PostureAssessment $postureAssessment)
     {
@@ -35,6 +39,9 @@ class AssessmentController extends Controller
             'assessment' => $postureAssessment,
             'viewMeasurements' => $viewMeasurements,
             'classification' => $this->interpretationEngine->classificationSummary($postureAssessment),
+            // The single shared point-band rule, printed so the reader can
+            // check every status against the cut-off it was judged on.
+            'deviationRule' => $this->measurementEngine->bandsRuleText(),
         ]);
     }
 

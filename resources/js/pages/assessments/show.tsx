@@ -76,7 +76,7 @@ const fmtDeviation = (v: any) => {
     return `${sign}${mag.toFixed(1)}°`
 }
 
-export default function AssessmentShow({ assessment, viewMeasurements, classification }: any) {
+export default function AssessmentShow({ assessment, viewMeasurements, classification, deviationRule }: any) {
     const patient = assessment.patient
     // The classification summary carries the user-facing pattern wording, so its
     // enriched rows are preferred over the raw clinical keys on the model.
@@ -183,6 +183,18 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                     </TabsList>
 
                     <TabsContent value="measurements" className="mt-4">
+                        {deviationRule && (
+                            <Card className="mb-4 border-dashed">
+                                <CardContent className="flex items-start gap-3 py-3 text-xs text-muted-foreground">
+                                    <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                                    <div>
+                                        <p className="font-medium text-foreground">Status threshold rule</p>
+                                        <p>{deviationRule}</p>
+                                        <p>The tolerance printed beside each reference is the band that status was judged on.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
                         <div className="grid gap-4 md:grid-cols-2">
                             {Object.entries(viewMeasurements).map(([view, measurements]: [string, any]) => (
                                 <Card key={view}>
@@ -226,6 +238,12 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                                         </div>
                                                         {note && (
                                                             <p className="pl-9 text-xs text-muted-foreground">{note}</p>
+                                                        )}
+                                                        {m.definition?.axis && (
+                                                            <p className="pl-9 text-[11px] text-muted-foreground">
+                                                                Axis: {m.definition.axis}
+                                                                {m.definition.positive ? ` · + = ${m.definition.positive}` : ''}
+                                                            </p>
                                                         )}
                                                     </div>
                                                 )
@@ -288,7 +306,7 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                         </div>
                                         {classificationInfo.suspected_pattern && (
                                             <div className="flex justify-between gap-2">
-                                                <span className="text-muted-foreground">Main Finding</span>
+                                                <span className="text-muted-foreground">Suspected Pattern</span>
                                                 <span className="font-medium">
                                                     {classificationInfo.suspected_pattern_label
                                                         || `Possible ${humanize(classificationInfo.suspected_pattern)} Pattern`}
@@ -324,6 +342,49 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                 </CardContent>
                             </Card>
                         )}
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Target className="h-4 w-4" />
+                                    Decision Summary
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Result</span>
+                                    <span className="font-medium">{classificationDisplay}</span>
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Main Finding</span>
+                                    <span className="font-medium">{classificationInfo.main_finding || '-'}</span>
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Suspected Pattern</span>
+                                    <span className="font-medium">
+                                        {classificationInfo.suspected_pattern_label || '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Secondary Finding</span>
+                                    <span className="font-medium">
+                                        {classificationInfo.secondary_pattern_label || '-'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Asymmetry</span>
+                                    <span className="font-medium">
+                                        {classificationInfo.asymmetry_flag ? 'Detected' : 'Not detected'}
+                                    </span>
+                                </div>
+                                <div className="flex justify-between gap-2">
+                                    <span className="text-muted-foreground">Confidence</span>
+                                    <span className="font-medium">
+                                        {classificationInfo.confidence_label || classificationInfo.confidence_level || '-'}
+                                    </span>
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {classifications.length === 0 ? (
                             <Card><CardContent className="py-8 text-center text-muted-foreground">No classifications</CardContent></Card>

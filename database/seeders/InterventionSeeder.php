@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Models\MuscleCondition;
 use App\Models\PostureIntervention;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Str;
 
 /**
  * Seeds the starter CADANGAN INTERVENSI catalogue for every program the app
@@ -53,11 +55,11 @@ class InterventionSeeder extends Seeder
             ['stretching', 'Chest & Hip Flexor Stretch', 'Simultaneously open the chest and hip flexors in the water.', '2 x 30 sec', 'Daily', 10, 'intermediate'],
             ['strengthening', 'Deep Core & Scapular Control', 'Combine scapular retraction with core bracing.', '3 x 10 reps', '3x per week', 15, 'advanced'],
         ],
-        'flatback' => [
+        'flat_back' => [
             ['exercise', 'Lumbar Mobility Drill', 'Stand in chest-deep water. Cat-cow stretch, gentle trunk rotations.', '3 x 10 reps', 'Daily', 10, 'beginner'],
-            ['exercise', 'Dynamic Rotation', 'Stand with feet planted. Rotate trunk side to side with arm movement.', '3 x 8 reps', '3x per week', 15, 'intermediate'],
-            ['postural_awareness', 'Balance Training', 'Stand on one leg in water. Progress to eyes closed.', '3 x 30 sec', '3x per week', 15, 'intermediate'],
-            ['exercise', 'Spinal Extension Flow', 'Float prone. Alternate between arching and rounding spine gently.', '3 x 8 reps', '3x per week', 15, 'intermediate'],
+            ['strengthening', 'Prone Lumbar Arch Float', 'Float face down with a noodle and gently lift the chest to strengthen the back extensors and restore the lower-back curve.', '3 x 30 sec', 'Daily', 10, 'beginner'],
+            ['strengthening', 'High-Knee Water March', 'Stand in waist-deep water and lift the knees high one at a time to strengthen the weak hip flexors.', '3 x 12 reps', '3x per week', 15, 'beginner'],
+            ['strengthening', 'Pool-Edge Glute Kickback', 'Hold the pool edge and push one straight leg backwards, squeezing the buttock to strengthen the gluteus maximus.', '3 x 12 reps each leg', '3x per week', 15, 'intermediate'],
         ],
         'genu_recurvatum' => [
             ['strengthening', 'Hamstring Activation', 'Strengthen hamstrings to control knee hyperextension.', '3 x 10 reps', '3x per week', 15, 'intermediate'],
@@ -79,10 +81,35 @@ class InterventionSeeder extends Seeder
             ['stretching', 'Hamstring Float Stretch', 'Supine float with the leg extended to lengthen the hamstrings.', '2 x 30 sec', 'Daily', 10, 'beginner'],
             ['postural_awareness', 'Standing Knee Alignment', 'Stand in chest-deep water and hold a straight but unlocked knee.', '3 x 30 sec', 'Daily', 10, 'beginner'],
         ],
-        'swayback' => [
+        'sway_back' => [
             ['strengthening', 'Glute Bridge Float', 'Supine float, press the hips into extension using the gluteals only.', '3 x 10 reps', '3x per week', 15, 'intermediate'],
-            ['stretching', 'Hip Flexor Float Stretch', 'Kneeling float with a posterior pelvic tilt to lengthen the hip flexors.', '2 x 30 sec', 'Daily', 10, 'beginner'],
+            ['strengthening', 'High-Knee Water March', 'Stand in waist-deep water and lift the knees high one at a time to strengthen the weak hip flexors.', '3 x 12 reps', '3x per week', 15, 'beginner'],
             ['postural_awareness', 'Rib-Pelvis Stacking', 'Stand in shallow water and stack the ribs directly over the pelvis.', '3 x 30 sec', 'Daily', 10, 'beginner'],
+        ],
+        'postural_scoliosis' => [
+            ['stretching', 'Side-Lying Float Stretch', 'Float on your side with the tight (concave) side facing up and reach the top arm overhead to lengthen it.', '3 x 30 sec', 'Daily', 10, 'beginner'],
+            ['postural_awareness', 'Trunk Shift in Chest-Deep Water', 'Stand tall and shift the ribcage towards the convex side, hold for 5 seconds, then relax.', '3 x 10 reps', '3x per week', 10, 'beginner'],
+            ['strengthening', 'Long-Reach Backstroke Kick', 'Backstroke kick with the convex-side arm reaching long overhead to build even trunk control.', '3 x 1 length', '3x per week', 15, 'intermediate'],
+        ],
+        'anterior_pelvic_tilt' => [
+            ['postural_awareness', 'Pelvic Tuck Float', 'Float on your back and gently tuck the pelvis to flatten the lower back, then release.', '3 x 10 reps', 'Daily', 10, 'beginner'],
+            ['stretching', 'Water Lunge Hip Flexor Stretch', 'In a lunge at the pool wall, tuck the pelvis to stretch the front of the back hip.', '3 x 30 sec each leg', '3x per week', 10, 'beginner'],
+            ['strengthening', 'Pool-Edge Glute Kickback', 'Hold the pool edge and push one straight leg backwards, squeezing the buttock.', '3 x 12 reps each leg', '3x per week', 15, 'intermediate'],
+        ],
+        'posterior_pelvic_tilt' => [
+            ['stretching', 'Prone Lumbar Arch Float', 'Float face down with a noodle and gently lift the chest to restore the lower-back curve.', '3 x 30 sec', 'Daily', 10, 'beginner'],
+            ['postural_awareness', 'Long-Stride Water Walk', 'Walk across the pool with long strides and a tall chest, keeping a gentle lower-back curve.', '3 x 1 length', '3x per week', 10, 'beginner'],
+            ['strengthening', 'High-Knee Water March', 'Stand in waist-deep water and lift the knees high one at a time to work the hip flexors.', '3 x 12 reps', '3x per week', 15, 'intermediate'],
+        ],
+        'uneven_shoulder' => [
+            ['stretching', 'Shoulder Shrug Release', 'In shoulder-deep water, lift both shoulders and let them drop, relaxing the higher side.', '3 x 10 reps', 'Daily', 5, 'beginner'],
+            ['strengthening', 'Pool-Wall Scapula Squeeze', 'Face the wall, pull the shoulder blades back and down evenly and hold for 3 seconds.', '3 x 12 reps', '3x per week', 10, 'beginner'],
+            ['strengthening', 'Breaststroke Arm Pull', 'Standing in the water, sweep both arms in a slow breaststroke pull with even effort on each side.', '3 x 1 length', '3x per week', 15, 'intermediate'],
+        ],
+        'genu_valgum' => [
+            ['strengthening', 'Side-Step Water Walk', 'Step sideways across the pool keeping the knees in line with the toes.', '3 x 1 width', '3x per week', 10, 'beginner'],
+            ['strengthening', 'Pool-Wall Clamshell', 'Lie on your side at the wall with knees bent and open the top knee against the water.', '3 x 12 reps each side', '3x per week', 10, 'beginner'],
+            ['strengthening', 'Knees-Out Water Squat', 'Squat in chest-deep water while pushing the knees gently outwards over the toes.', '3 x 10 reps', '3x per week', 10, 'intermediate'],
         ],
     ];
 
@@ -117,15 +144,15 @@ class InterventionSeeder extends Seeder
             ['Lower Back', 'Gentle lumbar effleurage to ease the increased lumbar curve.', 10, '3x per week'],
             ['Upper Trap', 'Kneading from neck to shoulder to settle the shoulder girdle.', 10, '2x per week'],
         ],
-        'flatback' => [
-            ['Thoracic', 'Kneading along the thoracic spine to restore segmental mobility.', 10, '3x per week'],
-            ['Lower Back', 'Gentle effleurage with sustained pressure on the lumbar paraspinals.', 10, '3x per week'],
-            ['Glute', 'Deep kneading on the gluteals to support a neutral pelvis.', 10, '2x per week'],
+        'flat_back' => [
+            ['Hamstrings', 'Long strokes along the back of the thigh to release the tight hamstrings.', 10, '3x per week'],
+            ['Abdominals', 'Light circular strokes over the abdomen to ease the tight rectus abdominis.', 5, '2x per week'],
+            ['Upper Back', 'Gentle effleurage between the shoulder blades to relax the upper back.', 10, '2x per week'],
         ],
         'genu_recurvatum' => [
-            ['Hamstring', 'Cross-fibre friction along the hamstring to support knee control.', 10, '3x per week'],
+            ['Front Thigh (Quadriceps)', 'Kneading along the front of the thigh to relax the tight quadriceps that push the knee back.', 10, '3x per week'],
             ['Calf', 'Kneading strokes along the gastrocnemius and soleus with trigger point pressure.', 10, '3x per week'],
-            ['Glute', 'Deep kneading on the gluteals to improve lower limb alignment.', 10, '2x per week'],
+            ['Hip Flexors', 'Gentle pressure and strokes at the front of the hip to release the tight hip flexors.', 10, '2x per week'],
         ],
         'frontal_asymmetry' => [
             ['Neck', 'Balanced circular massage on both sides of the cervical spine.', 10, '3x per week'],
@@ -139,13 +166,38 @@ class InterventionSeeder extends Seeder
         ],
         'flexed_knee' => [
             ['Hamstring', 'Cross-fibre friction along the hamstrings to support knee extension control.', 10, '3x per week'],
-            ['Quadriceps', 'Long strokes along the quadriceps to release the shortened anterior thigh.', 10, '3x per week'],
+            ['Hip Flexors', 'Gentle pressure and strokes at the front of the hip to release the tight hip flexors.', 10, '3x per week'],
             ['Calf', 'Kneading along the calf to reduce the pull that keeps the knee flexed.', 10, '2x per week'],
         ],
-        'swayback' => [
-            ['Lower Back', 'Gentle effleurage along the lumbar spine to ease the flattened lumbar curve.', 10, '3x per week'],
-            ['Hip Flexor', 'Sustained pressure on the hip flexors to reduce the anterior pelvic shift.', 10, '3x per week'],
-            ['Glute', 'Deep kneading on the gluteals to restore pelvic support.', 10, '2x per week'],
+        'sway_back' => [
+            ['Hamstrings', 'Long strokes along the back of the thigh to release the tight hamstrings.', 10, '3x per week'],
+            ['Upper Abdominals', 'Light circular strokes over the upper abdomen to ease the tight upper rectus abdominis.', 5, '2x per week'],
+            ['Side Waist (Upper Obliques)', 'Gentle kneading along the upper side waist to relax the tight obliques.', 5, '2x per week'],
+        ],
+        'postural_scoliosis' => [
+            ['Lower Back (Concave Side)', 'Slow strokes along the tight side of the lower back and quadratus lumborum.', 10, '3x per week'],
+            ['Side Waist (Obliques)', 'Gentle kneading of the side waist on the tight side to help it lengthen.', 10, '2x per week'],
+            ['Upper Back', 'Light effleurage between the shoulder blades to relax the upper back evenly.', 10, '2x per week'],
+        ],
+        'anterior_pelvic_tilt' => [
+            ['Hip Flexors', 'Gentle pressure and strokes at the front of the hip to release the hip flexors.', 10, '3x per week'],
+            ['Lower Back', 'Long strokes along the lumbar muscles to ease lower-back tightness.', 10, '3x per week'],
+            ['Front Thigh (Quadriceps)', 'Kneading along the front of the thigh to relax the rectus femoris.', 10, '2x per week'],
+        ],
+        'posterior_pelvic_tilt' => [
+            ['Hamstrings', 'Long strokes along the back of the thigh to release tight hamstrings.', 10, '3x per week'],
+            ['Buttocks (Gluteals)', 'Circular kneading over the buttocks to relax the gluteal muscles.', 10, '3x per week'],
+            ['Abdominals', 'Light circular strokes over the abdomen to ease tight abdominal muscles.', 5, '2x per week'],
+        ],
+        'uneven_shoulder' => [
+            ['Upper Trapezius (High Side)', 'Kneading along the top of the higher shoulder to relax the upper trapezius.', 10, '3x per week'],
+            ['Neck (SCM and Scalenes)', 'Gentle strokes down the side of the neck on the tight side.', 5, '3x per week'],
+            ['Between the Shoulder Blades', 'Light strokes around the shoulder blades to balance both sides.', 10, '2x per week'],
+        ],
+        'genu_valgum' => [
+            ['Inner Thigh (Adductors)', 'Long strokes along the inner thigh to release the tight adductors.', 10, '3x per week'],
+            ['Outer Hip (TFL / IT Band)', 'Gentle kneading along the outer hip and thigh to ease the TFL.', 10, '3x per week'],
+            ['Back of Thigh', 'Long strokes along the hamstrings to relax the biceps femoris.', 5, '2x per week'],
         ],
     ];
 
@@ -175,9 +227,9 @@ class InterventionSeeder extends Seeder
             ['strengthening', 'Bird Dog', 'Extend the opposite arm and leg while holding a neutral spine.', '3 x 8 reps', '3x per week', 10, 'intermediate'],
             ['postural_awareness', 'Wall Slide', 'Slide the arms up the wall keeping the ribs down and back flat.', '3 x 10 reps', '3x per week', 10, 'intermediate'],
         ],
-        'flatback' => [
+        'flat_back' => [
             ['strengthening', 'Prone Extension', 'Lift the upper body gently from prone to strengthen spinal extensors.', '3 x 8 reps', '3x per week', 10, 'beginner'],
-            ['postural_awareness', 'Cat-Cow Mobility', 'Flow between flexion and extension on all fours.', '3 x 10 reps', 'Daily', 5, 'beginner'],
+            ['stretching', 'Hamstring Stretch', 'Sit with one leg straight and lean forward from the hips until you feel a stretch.', '3 x 30 sec each leg', 'Daily', 5, 'beginner'],
         ],
         'genu_recurvatum' => [
             ['strengthening', 'Hamstring Bridge', 'Bridge with the knees softly bent to control hyperextension.', '3 x 10 reps', '3x per week', 10, 'beginner'],
@@ -195,15 +247,44 @@ class InterventionSeeder extends Seeder
             ['strengthening', 'Quad Set', 'Tighten the quadriceps with the knee straight and hold for 5 seconds.', '3 x 10 reps', 'Daily', 5, 'beginner'],
             ['stretching', 'Standing Hamstring Stretch', 'Place the heel on a low step and hinge forward with a flat back.', '2 x 30 sec', 'Daily', 5, 'beginner'],
         ],
-        'swayback' => [
+        'sway_back' => [
             ['strengthening', 'Glute Bridge', 'Bridge while keeping the ribs down and the pelvis tucked.', '3 x 10 reps', '3x per week', 10, 'beginner'],
             ['postural_awareness', 'Rib Down Breathing', 'Breathe into the lower ribs while keeping the pelvis tucked.', '3 x 1 min', 'Daily', 5, 'beginner'],
+        ],
+        'postural_scoliosis' => [
+            ['strengthening', 'Side Plank (Convex Side Down)', 'Hold a side plank on the convex side to strengthen the weaker trunk muscles.', '3 x 20 sec', '3x per week', 5, 'intermediate'],
+            ['lifestyle', 'Mirror Posture Check', 'Stand in front of a mirror and level the shoulders and waist line.', '2 x 1 min', 'Daily', 3, 'beginner'],
+        ],
+        'anterior_pelvic_tilt' => [
+            ['strengthening', 'Glute Bridge', 'Lie on your back, tuck the pelvis and lift the hips by squeezing the buttocks.', '3 x 12 reps', '3x per week', 5, 'beginner'],
+            ['strengthening', 'Dead Bug Core Hold', 'On your back, keep the lower back flat while slowly lowering the opposite arm and leg.', '3 x 10 reps', '3x per week', 5, 'intermediate'],
+        ],
+        'posterior_pelvic_tilt' => [
+            ['stretching', 'Hamstring Stretch', 'Sit with one leg straight and lean forward from the hips until you feel a stretch.', '3 x 30 sec each leg', 'Daily', 5, 'beginner'],
+            ['exercise', 'Cat-Camel Mobility', 'On hands and knees, gently arch and round the back to restore lower-back movement.', '2 x 10 reps', 'Daily', 3, 'beginner'],
+        ],
+        'uneven_shoulder' => [
+            ['stretching', 'Neck Side Stretch', 'Tilt the ear towards the lower shoulder to stretch the tight upper trapezius.', '3 x 20 sec each side', 'Daily', 3, 'beginner'],
+            ['strengthening', 'Band Pull-Apart', 'Hold a band at shoulder height and pull it apart, squeezing both shoulder blades evenly.', '3 x 12 reps', '3x per week', 5, 'beginner'],
+        ],
+        'genu_valgum' => [
+            ['strengthening', 'Side-Lying Leg Raise', 'Lie on your side and lift the top leg slightly behind you to work the gluteus medius.', '3 x 12 reps each side', '3x per week', 5, 'beginner'],
+            ['exercise', 'Single-Leg Balance', 'Stand on one leg with the knee soft and in line with the toes.', '3 x 30 sec each leg', 'Daily', 3, 'beginner'],
         ],
     ];
 
     public function run(): void
     {
-        foreach (config('sparisk.intervention_posture_types') as $postureType => $label) {
+        // Every key in the catalogue, labelled from config or the muscle-map
+        // condition it belongs to.
+        $postureTypes = array_unique(array_merge(array_keys(self::AQUATIC), array_keys(self::MASSAGE), array_keys(self::GENERAL)));
+        $conditions = MuscleCondition::pluck('name', 'slug');
+
+        foreach ($postureTypes as $postureType) {
+            $label = config("sparisk.intervention_posture_types.{$postureType}")
+                ?? $conditions[$postureType]
+                ?? Str::headline($postureType);
+
             $this->seedAquatic($postureType, $label);
             $this->seedMassage($postureType, $label);
             $this->seedGeneral($postureType, $label);
@@ -297,6 +378,8 @@ class InterventionSeeder extends Seeder
                 'posture_label' => $label,
                 'program' => $program,
                 'order_index' => $orderIndex,
+                // Days the admin already picked are kept, like the image.
+                'days' => $existing?->days ?: PostureIntervention::defaultDays($attributes['frequency'] ?? null, $program),
             ])
         );
     }

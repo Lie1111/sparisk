@@ -198,6 +198,18 @@
     .c-dev  { width: 13%; text-align: right; }
     .val { font-weight: bold; }
 
+    /* ---------- Primary Findings photo column ----------
+       A square crop of the body area the finding describes, so the reader can
+       see where on the photo the measurement was taken. */
+    .c-photo { width: 16%; text-align: center; }
+    .finding-crop {
+        display: block;
+        width: 84px;
+        height: 84px;
+        border: 1px solid #D7E0E5;
+        border-radius: 3px;
+    }
+
     /* ---------- Posture plate (one view per page) ----------
        The photo sits full width above its measurement table, so the table
        always has the whole content width and neither element can run past the
@@ -244,10 +256,10 @@
     }
     table.data.compact th { font-size: 6.5px; padding: 4px 4px; }
     table.data.compact td { font-size: 8px; padding: 3px 4px; line-height: 1.3; }
-    table.data.compact .c-code { width: 15%; }
-    table.data.compact .c-sec { width: 43%; }
-    table.data.compact .c-dev { width: 21%; }
-    table.data.compact .c-corr { width: 21%; }
+    table.data.compact .c-code { width: 12%; }
+    table.data.compact .c-sec { width: 30%; }
+    table.data.compact .c-dev { width: 15%; }
+    table.data.compact .c-corr { width: 18%; }
 
     /* ---------- Labels beside a posture photo ----------
        A photo is framed by two gutters of equal width: level names and their
@@ -461,6 +473,10 @@
         </td>
         <td>
             <span class="summary-label">Main Finding</span>
+            <span class="summary-value">{{ $classification['main_finding'] ?: '-' }}</span>
+        </td>
+        <td>
+            <span class="summary-label">Suspected Pattern</span>
             <span class="summary-value">{{ $classification['suspected_pattern_label'] ?: '-' }}</span>
         </td>
         <td>
@@ -470,10 +486,6 @@
         <td>
             <span class="summary-label">Asymmetry</span>
             <span class="summary-value">{{ $classification['asymmetry_flag'] ? 'Detected' : 'Not detected' }}</span>
-        </td>
-        <td>
-            <span class="summary-label">Confidence</span>
-            <span class="summary-value">{{ $classification['confidence_label'] ?: '-' }}</span>
         </td>
     </tr>
 </table>
@@ -647,9 +659,12 @@
 <div class="pb"></div>
 
 {{-- ============ DETAILED ANGLE BREAKDOWN (admin panel only) ============ --}}
-{{-- Requested only by the web admin (SpariskReportPdfService::download(…, true)).
-     The mobile app never sets $extended, so its document is unchanged. --}}
-@if ($extended)
+{{-- HIDDEN at the client's request (2026-10-26). The per-view photo plates
+     with the compact table beside each image stay in the report; only this
+     standalone breakdown table is hidden. To show it again, remove the
+     @if(0) wrapper (replace it with @if ($extended)) and the matching @endif.
+--}}
+@if (0)
     <div class="band first">Detailed Angle Breakdown</div>
     <p class="muted" style="margin: 0 0 6px 0">
         Full per-view measurement detail. Every marker lists the measured anatomical
@@ -677,9 +692,11 @@
                     @foreach ($view['rows'] as $row)
                         <tr>
                             <td>{{ $row['code'] !== '' ? $row['code'] : '—' }}</td>
-                            <td>{{ $row['name'] }}</td>
+                            <td>
+                                {{ $row['name'] }}
+                            </td>
                             <td class="c-meas">{{ $row['measured'] }}°</td>
-                            <td class="c-ref">{{ $row['reference'] !== null ? $row['reference'].'°' : 'Baseline' }}@if ($row['tolerance'] !== null) <span class="muted">±{{ $row['tolerance'] }}°</span>@endif</td>
+                            <td class="c-ref">{{ $row['reference'] !== null ? $row['reference'].'°' : 'Baseline' }}</td>
                             <td class="c-dev val" style="color: {{ $row['color'] }}">{{ $row['deviation'] !== null ? $row['deviation'].'°' : '—' }}</td>
                             <td>{{ $row['reference_level'] ?: ($row['is_baseline'] ? 'Individual Baseline' : '-') }}</td>
                             <td style="color: {{ $row['color'] }}">{{ $row['status'] }}</td>
@@ -760,13 +777,20 @@
 
 @if (count($findings))
     <div class="band {{ $detailFirst ? 'first' : '' }}">Primary Findings</div>
-    <table class="data">
+    <table class="data findings">
         <thead>
-            <tr><th>Finding</th><th class="c-sec">Note</th><th class="c-val">Value</th><th class="c-sec">Alignment</th></tr>
+            <tr><th class="c-photo">Photo</th><th>Finding</th><th class="c-sec">Note</th><th class="c-val">Value</th><th class="c-sec">Alignment</th></tr>
         </thead>
         <tbody>
             @foreach ($findings as $finding)
                 <tr>
+                    <td class="c-photo">
+                        @if (! empty($finding['crop']))
+                            <img class="finding-crop" src="{{ $finding['crop'] }}" alt="{{ $finding['name'] }}">
+                        @else
+                            <span class="muted">—</span>
+                        @endif
+                    </td>
                     <td>{{ $finding['name'] }}</td>
                     <td>{{ $finding['note'] ?: '-' }}</td>
                     <td class="val" style="color: {{ $finding['color'] }}">{{ $finding['value'] }}°</td>

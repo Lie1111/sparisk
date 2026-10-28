@@ -15,13 +15,13 @@ export default function NavRoutes() {
             isActive: route().current("posture-settings.index"),
         },
         {
-            title: "Interventions",
+            title: "Treatment Plans",
             url: "/interventions",
             icon: Dumbbell,
             isActive: route().current("interventions.index"),
         },
         {
-            title: "Posture Markers",
+            title: "Muscle Map",
             url: "/posture-markers",
             icon: Crosshair,
             isActive: route().current("posture-markers.index"),

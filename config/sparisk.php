@@ -270,57 +270,72 @@ return [
                 '50+' => ['level' => 'sata_validated', 'value' => 48.0, 'min' => 43.1, 'max' => 52.9, 'source' => 'SATA Age-Based Posture Reference v1.1 — CVA / head reference (≥50 y, 48°)'],
             ],
         ],
+        /*
+        | C3/D3 — Shoulder Alignment (sagittal).
+        |
+        | The app measures the acromion against the plumb line through the hip
+        | joint centre, so 0° means the shoulder is stacked over the hip. The
+        | published photogrammetry "shoulder angle" norms (64.5° / 69.2° / 72.4°)
+        | are built on a different axis and different landmarks: subtracting them
+        | from a near-zero plumb reading produced the −70° deviation the client
+        | reported for C3/D3. They therefore must NOT be applied to this
+        | measurement. The reference is the definitional neutral (0°) with the
+        | SATA shoulder tolerance (±5°), the same convention C1/C2 use.
+        */
         'D3' => [
-            'label' => 'Shoulder',
+            'label' => 'Shoulder Alignment',
             'region' => 'shoulder',
             'sex_if_required' => false,
+            'definition' => [
+                'axis' => 'sagittal plumb — acromion over the hip joint centre',
+                'landmarks' => 'shoulder (acromion) → hip, side view',
+                'positive' => 'shoulder anterior to the hip (protraction)',
+                'note' => '0° = shoulder stacked over the hip. The published photogrammetry shoulder angle (64.5°/69.2°/72.4°) uses a different axis and is not applied.',
+            ],
             'sections' => [
                 ['section' => 'C3', 'view' => 'right_side'],
                 ['section' => 'D3', 'view' => 'left_side'],
             ],
             'groups' => [
-                '6-8' => [
-                    'level' => 'published', 'value' => 64.5, 'min' => 52.7, 'max' => 76.3,
-                    'source' => '2025 paediatric photogrammetry — shoulder angle (7–9 y)†',
-                ],
-                '9-12' => [
-                    'level' => 'published', 'value' => 69.2, 'min' => 57.3, 'max' => 81.1,
-                    'source' => '2025 paediatric photogrammetry — shoulder angle (10–14 y)†',
-                ],
-                '13-18' => [
-                    'level' => 'published', 'value' => 72.4, 'min' => 58.9, 'max' => 85.9,
-                    'source' => '2025 paediatric photogrammetry — shoulder angle (15–17 y)†',
-                ],
-                '19-49' => ['level' => 'individual_baseline'],
-                '50+' => ['level' => 'individual_baseline'],
+                '6-8' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: acromion stacked over the hip (0°)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: acromion stacked over the hip (0°)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: acromion stacked over the hip (0°)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: acromion stacked over the hip (0°)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: acromion stacked over the hip (0°)'],
             ],
         ],
+        /*
+        | C4/D4 — Pelvic Alignment (sagittal).
+        |
+        | The app measures the hip joint centre against the plumb line through the
+        | ankle, so 0° means the hip is stacked over the ankle and the sign is
+        | anterior (+) / posterior (−) translation. A true ASIS–PSIS pelvic tilt
+        | cannot be derived from the pose landmarks the app captures, so the
+        | published pelvic-tilt norms (12.6° boys / 14.7° girls / −12.26° adults)
+        | use a different axis and must NOT be subtracted from this reading. The
+        | reference is the definitional neutral (0°) with the SATA pelvic
+        | tolerance (±5°).
+        */
         'D4' => [
-            'label' => 'Pelvic Tilt',
+            'label' => 'Pelvic Alignment',
             'region' => 'pelvis',
-            'sex_if_required' => true,
+            'sex_if_required' => false,
+            'definition' => [
+                'axis' => 'sagittal plumb — hip joint centre over the ankle',
+                'landmarks' => 'hip → ankle, side view',
+                'positive' => 'hip anterior to the ankle (anterior translation)',
+                'note' => '0° = hip stacked over the ankle. True ASIS–PSIS pelvic tilt is not measurable from the current landmarks, so the published tilt norms (12.6°/14.7°/−12.26°) are not applied.',
+            ],
             'sections' => [
                 ['section' => 'C4', 'view' => 'right_side'],
                 ['section' => 'D4', 'view' => 'left_side'],
             ],
             'groups' => [
-                '6-8' => [
-                    'male' => ['level' => 'published', 'value' => 12.6, 'min' => 7.8, 'max' => 17.4, 'source' => '2025 paediatric photogrammetry — pelvic tilt, boys (7–17 y)†'],
-                    'female' => ['level' => 'published', 'value' => 14.7, 'min' => 9.8, 'max' => 19.6, 'source' => '2025 paediatric photogrammetry — pelvic tilt, girls (7–17 y)†'],
-                ],
-                '9-12' => [
-                    'male' => ['level' => 'published', 'value' => 12.6, 'min' => 7.8, 'max' => 17.4, 'source' => '2025 paediatric photogrammetry — pelvic tilt, boys (7–17 y)†'],
-                    'female' => ['level' => 'published', 'value' => 14.7, 'min' => 9.8, 'max' => 19.6, 'source' => '2025 paediatric photogrammetry — pelvic tilt, girls (7–17 y)†'],
-                ],
-                '13-18' => [
-                    'male' => ['level' => 'published', 'value' => 12.6, 'min' => 7.8, 'max' => 17.4, 'source' => '2025 paediatric photogrammetry — pelvic tilt, boys (7–17 y)†'],
-                    'female' => ['level' => 'published', 'value' => 14.7, 'min' => 9.8, 'max' => 19.6, 'source' => '2025 paediatric photogrammetry — pelvic tilt, girls (7–17 y)†'],
-                ],
-                '19-49' => [
-                    'level' => 'published', 'value' => -12.26, 'min' => -18.07, 'max' => -6.45,
-                    'source' => 'Published systematic review — adult pelvic tilt (−12.26 ± 5.81)**',
-                ],
-                '50+' => ['level' => 'individual_baseline'],
+                '6-8' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: hip stacked over the ankle (0°)'],
+                '9-12' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: hip stacked over the ankle (0°)'],
+                '13-18' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: hip stacked over the ankle (0°)'],
+                '19-49' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: hip stacked over the ankle (0°)'],
+                '50+' => ['level' => 'sata_validated', 'value' => 0.0, 'min' => -5.0, 'max' => 5.0, 'source' => 'SATA validated — definitional neutral: hip stacked over the ankle (0°)'],
             ],
         ],
         'D5' => [
@@ -349,7 +364,7 @@ return [
             ],
         ],
         'D6' => [
-            'label' => 'Tibia Alignment',
+            'label' => 'Lower Leg Alignment',
             'region' => 'lower_limb',
             'sex_if_required' => false,
             'sections' => [
@@ -408,7 +423,7 @@ return [
             ],
         ],
         'thoracic_kyphosis' => [
-            'label' => 'Upper-Back Posture Indicator',
+            'label' => 'Upper Back Curve',
             'region' => 'thoracic',
             'sex_if_required' => false,
             'sections' => [
@@ -423,7 +438,7 @@ return [
             ],
         ],
         'lumbar_lordosis' => [
-            'label' => 'Lower-Back Posture Indicator',
+            'label' => 'Lower Back Curve',
             'region' => 'pelvis',
             'sex_if_required' => false,
             'sections' => [
@@ -453,11 +468,61 @@ return [
     'sagittal_parameters' => [
         'D1' => ['label' => 'Body Alignment',        'sections' => ['C1', 'D1']],
         'D2' => ['label' => 'Head',                  'sections' => ['side_cva']],
-        'D3' => ['label' => 'Shoulder',              'sections' => ['C3', 'D3']],
-        'D4' => ['label' => 'Pelvic Tilt',           'sections' => ['C4', 'D4']],
+        'D3' => ['label' => 'Shoulder Alignment',    'sections' => ['C3', 'D3']],
+        'D4' => ['label' => 'Pelvic Alignment',      'sections' => ['C4', 'D4']],
         'D5' => ['label' => 'Knee',                  'sections' => ['C5', 'D5']],
-        'D6' => ['label' => 'Tibia Alignment',       'sections' => ['C6', 'D6']],
+        'D6' => ['label' => 'Lower Leg Alignment', 'sections' => ['C6', 'D6']],
         'D7' => ['label' => 'Foot / Ankle Alignment','sections' => ['C7', 'D7']],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Independent Parameters (evidence counting)
+    |--------------------------------------------------------------------------
+    | The decision engine must count INDEPENDENT parameters, not rows. C4 and D4
+    | are the same pelvic parameter measured on the two side views, as are C5/D5
+    | or the front/back pair A1/B1. Counting rows let one wrong parameter produce
+    | two "independent" evidence and confirm a pattern — which is exactly how the
+    | shoulder/pelvic definition mismatch pushed the report into Flatback.
+    |
+    | Sections that are derived means of other rows (B7 = mean of both knees,
+    | B8 = mean of both feet) never count as extra evidence.
+    */
+    'section_parameters' => [
+        'A1' => 'body_alignment',  'B1' => 'body_alignment',
+        'A2' => 'head_tilt',       'B2' => 'head_tilt',
+        'A3' => 'shoulder_level',  'B3' => 'shoulder_level',
+        'A4' => 'axillae',         'B4' => 'axillae',
+        'A5' => 'ribcage',
+        'A6' => 'trunk',           'B5' => 'trunk',
+        'A7' => 'pelvic_obliquity','B6' => 'pelvic_obliquity',
+        'A8' => 'knee_right',      'C5' => 'knee_right',
+        'A9' => 'knee_left',       'D5' => 'knee_left',
+        'A10' => 'foot_right',
+        'A11' => 'foot_left',
+        'B7' => 'knee_bilateral',
+        'B8' => 'foot_bilateral',
+        'C1' => 'body_alignment',  'D1' => 'body_alignment',
+        'C2' => 'head_position',   'D2' => 'head_position', 'side_cva' => 'head_position',
+        'C3' => 'shoulder_sagittal', 'D3' => 'shoulder_sagittal',
+        'C4' => 'pelvis_sagittal', 'D4' => 'pelvis_sagittal',
+        'C6' => 'tibia_right',     'D6' => 'tibia_left',
+        'C7' => 'foot_ankle_right','D7' => 'foot_ankle_left',
+        'side_kyphosis' => 'thoracic_curve',
+        'side_lordosis' => 'lumbar_curve',
+    ],
+
+    'derived_sections' => ['B7', 'B8'],
+
+    /*
+    | Midline parameters are not side-specific: both side views describe the
+    | same head/trunk/curve. Their pattern tokens must not be prefixed with
+    | RIGHT/LEFT, which would read as a one-sided finding.
+    */
+    'midline_parameters' => [
+        'body_alignment', 'head_tilt', 'head_position', 'trunk', 'axillae',
+        'ribcage', 'pelvic_obliquity', 'shoulder_level', 'shoulder_sagittal',
+        'pelvis_sagittal', 'thoracic_curve', 'lumbar_curve',
     ],
 
     /*
@@ -592,24 +657,87 @@ return [
         'B5'  => ['view' => 'back', 'label' => 'Trunk Alignment', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
         'B6'  => ['view' => 'back', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
         'B7'  => ['view' => 'back', 'label' => 'Knees', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
-        'B8'  => ['view' => 'back', 'label' => 'Feet', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
+        'B8'  => ['view' => 'back', 'label' => 'Feet Alignment', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'sata_validated'],
         'C1'  => ['view' => 'right_side', 'label' => 'Body Alignment', 'region' => 'alignment', 'reference_level' => 'individual_baseline'],
         'C2'  => ['view' => 'right_side', 'label' => 'Head Shift', 'region' => 'head', 'reference_level' => 'individual_baseline'],
-        'C3'  => ['view' => 'right_side', 'label' => 'Shoulder Angle', 'region' => 'shoulder', 'reference_level' => 'individual_baseline'],
-        'C4'  => ['view' => 'right_side', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'reference_level' => 'individual_baseline'],
+        'C3'  => ['view' => 'right_side', 'label' => 'Shoulder Alignment', 'region' => 'shoulder', 'reference_level' => 'sata_validated'],
+        'C4'  => ['view' => 'right_side', 'label' => 'Pelvic Alignment', 'region' => 'pelvis', 'reference_level' => 'sata_validated'],
         'C5'  => ['view' => 'right_side', 'label' => 'Knee', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
-        'C6'  => ['view' => 'right_side', 'label' => 'Tibia', 'region' => 'lower_limb', 'reference_level' => 'individual_baseline'],
+        'C6'  => ['view' => 'right_side', 'label' => 'Lower Leg', 'region' => 'lower_limb', 'reference_level' => 'individual_baseline'],
         'C7'  => ['view' => 'right_side', 'label' => 'Foot Angle', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
         'D1'  => ['view' => 'left_side', 'label' => 'Body Alignment', 'region' => 'alignment', 'reference_level' => 'individual_baseline'],
         'D2'  => ['view' => 'left_side', 'label' => 'Head Shift', 'region' => 'head', 'reference_level' => 'individual_baseline'],
-        'D3'  => ['view' => 'left_side', 'label' => 'Shoulder Angle', 'region' => 'shoulder', 'reference_level' => 'individual_baseline'],
-        'D4'  => ['view' => 'left_side', 'label' => 'Estimated Pelvic Alignment', 'region' => 'pelvis', 'reference_level' => 'individual_baseline'],
+        'D3'  => ['view' => 'left_side', 'label' => 'Shoulder Alignment', 'region' => 'shoulder', 'reference_level' => 'sata_validated'],
+        'D4'  => ['view' => 'left_side', 'label' => 'Pelvic Alignment', 'region' => 'pelvis', 'reference_level' => 'sata_validated'],
         'D5'  => ['view' => 'left_side', 'label' => 'Knee', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
-        'D6'  => ['view' => 'left_side', 'label' => 'Tibia', 'region' => 'lower_limb', 'reference_level' => 'individual_baseline'],
+        'D6'  => ['view' => 'left_side', 'label' => 'Lower Leg', 'region' => 'lower_limb', 'reference_level' => 'individual_baseline'],
         'D7'  => ['view' => 'left_side', 'label' => 'Foot Angle', 'region' => 'lower_limb', 'angle_mode' => 'orientation', 'reference_level' => 'individual_baseline'],
-        'side_cva'       => ['view' => 'right_side', 'label' => 'CVA / Head Reference', 'region' => 'head', 'reference_level' => 'sata_validated'],
-        'side_kyphosis'  => ['view' => 'right_side', 'label' => 'Upper-Back Posture Indicator', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
-        'side_lordosis'  => ['view' => 'right_side', 'label' => 'Lower-Back Posture Indicator', 'region' => 'pelvis', 'reference_level' => 'sata_validated'],
+        'side_cva'       => ['view' => 'right_side', 'label' => 'Head Position', 'region' => 'head', 'reference_level' => 'sata_validated'],
+        'side_kyphosis'  => ['view' => 'right_side', 'label' => 'Upper Back Curve', 'region' => 'thoracic', 'reference_level' => 'sata_validated'],
+        'side_lordosis'  => ['view' => 'right_side', 'label' => 'Lower Back Curve', 'region' => 'pelvis', 'reference_level' => 'sata_validated'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Measurement Definitions (single source of truth for axis and sign)
+    |--------------------------------------------------------------------------
+    | Every measured angle is defined by the same three things: the axis it is
+    | measured on, the two anatomical landmarks that form that axis, and what a
+    | positive value means. The measurement and reference must always use the
+    | SAME definition — this is the contract that the C3/D3 (shoulder) and C4/D4
+    | (pelvic) reference mismatch broke.
+    |
+    | The mobile app implements these definitions and the API exposes them with
+    | every measurement, so the app, the web portal and the PDF report can never
+    | describe a reading differently.
+    |
+    | `positive` for the left side view is resolved to the patient's anatomical
+    | front, so the same posture reads the same sign on both side views.
+    */
+    'measurement_definitions' => [
+        'A1' => ['axis' => 'vertical plumb — nose over the ankle midpoint', 'landmarks' => 'nose → midpoint(ankles), front view', 'positive' => 'upper landmark to the image right'],
+        'A2' => ['axis' => 'horizontal — eye line (ear line in the back view)', 'landmarks' => 'outer eye corners / earlobes', 'positive' => 'image right side lower'],
+        'A3' => ['axis' => 'horizontal — acromion line', 'landmarks' => 'left acromion → right acromion', 'positive' => 'image right shoulder lower'],
+        'A4' => ['axis' => 'vertical plumb — shoulder midpoint over hip midpoint', 'landmarks' => 'midpoint(acromia) → midpoint(hips)', 'positive' => 'shoulder midpoint to the image right'],
+        'A5' => ['axis' => 'shoulder line against pelvic line', 'landmarks' => 'acromion line − hip line', 'positive' => 'image right side rotated down'],
+        'A6' => ['axis' => 'vertical plumb — shoulder midpoint over ankle midpoint', 'landmarks' => 'midpoint(acromia) → midpoint(ankles)', 'positive' => 'shoulder midpoint to the image right'],
+        'A7' => ['axis' => 'horizontal — hip line', 'landmarks' => 'left hip → right hip', 'positive' => 'image right hip lower'],
+        'A8' => ['axis' => 'knee flexion at the joint', 'landmarks' => 'hip → knee → ankle (right)', 'positive' => 'extension; negative = flexion'],
+        'A9' => ['axis' => 'knee flexion at the joint', 'landmarks' => 'hip → knee → ankle (left)', 'positive' => 'extension; negative = flexion'],
+        'A10' => ['axis' => 'forward axis — foot progression', 'landmarks' => 'ankle → foot index (right)', 'positive' => 'external (toe-out)'],
+        'A11' => ['axis' => 'forward axis — foot progression', 'landmarks' => 'ankle → foot index (left)', 'positive' => 'external (toe-out)'],
+        'B1' => ['axis' => 'vertical plumb — nose over the ankle midpoint', 'landmarks' => 'nose → midpoint(ankles), back view', 'positive' => 'upper landmark to the image right'],
+        'B2' => ['axis' => 'horizontal — ear line', 'landmarks' => 'left earlobe → right earlobe', 'positive' => 'image right ear lower'],
+        'B3' => ['axis' => 'horizontal — acromion line', 'landmarks' => 'acromion line, back view', 'positive' => 'image right shoulder lower'],
+        'B4' => ['axis' => 'vertical plumb — shoulder midpoint over hip midpoint', 'landmarks' => 'midpoint(acromia) → midpoint(hips)', 'positive' => 'shoulder midpoint to the image right'],
+        'B5' => ['axis' => 'vertical plumb — shoulder midpoint over ankle midpoint', 'landmarks' => 'midpoint(acromia) → midpoint(ankles)', 'positive' => 'shoulder midpoint to the image right'],
+        'B6' => ['axis' => 'horizontal — hip line', 'landmarks' => 'hip line, back view', 'positive' => 'image right hip lower'],
+        'B7' => ['axis' => 'knee flexion at the joint', 'landmarks' => 'mean of the right and left hip → knee → ankle chains', 'positive' => 'extension; negative = flexion'],
+        /*
+        | B8 was previously the ankle→heel angle. The heel sits behind and below
+        | the ankle by about the length/height of the calcaneus, so that angle
+        | reported foot ANATOMY (~47°), not alignment. B8 now reuses the same
+        | forward-axis foot progression measurement as A10/A11 (the mean of the
+        | two feet) and the same age-based external-progression reference.
+        */
+        'B8' => ['axis' => 'forward axis — foot progression (both feet)', 'landmarks' => 'mean of the right and left ankle → foot index', 'positive' => 'external (toe-out)', 'note' => 'Rear-foot inversion/eversion cannot be measured from the 2D pose landmarks; this is the same valid measure as A10/A11.'],
+        'C1' => ['axis' => 'vertical plumb — ear over the ankle', 'landmarks' => 'ear → ankle, right side', 'positive' => 'ear anterior to the ankle'],
+        'C2' => ['axis' => 'vertical plumb — ear over the shoulder', 'landmarks' => 'ear → shoulder, right side', 'positive' => 'head anterior to the shoulder'],
+        'C3' => ['axis' => 'vertical plumb — acromion over the hip', 'landmarks' => 'shoulder → hip, right side', 'positive' => 'shoulder anterior to the hip'],
+        'C4' => ['axis' => 'vertical plumb — hip over the ankle', 'landmarks' => 'hip → ankle, right side', 'positive' => 'hip anterior to the ankle'],
+        'C5' => ['axis' => 'knee flexion at the joint', 'landmarks' => 'hip → knee → ankle, right side', 'positive' => 'extension; negative = flexion'],
+        'C6' => ['axis' => 'vertical plumb — knee over the ankle', 'landmarks' => 'knee → ankle, right side', 'positive' => 'knee anterior to the ankle'],
+        'C7' => ['axis' => 'ankle angle against the lower leg', 'landmarks' => 'knee → ankle → foot index, right side', 'positive' => 'dorsiflexion (toes lift)'],
+        'D1' => ['axis' => 'vertical plumb — ear over the ankle', 'landmarks' => 'ear → ankle, left side', 'positive' => 'ear anterior to the ankle'],
+        'D2' => ['axis' => 'vertical plumb — ear over the shoulder', 'landmarks' => 'ear → shoulder, left side', 'positive' => 'head anterior to the shoulder'],
+        'D3' => ['axis' => 'vertical plumb — acromion over the hip', 'landmarks' => 'shoulder → hip, left side', 'positive' => 'shoulder anterior to the hip'],
+        'D4' => ['axis' => 'vertical plumb — hip over the ankle', 'landmarks' => 'hip → ankle, left side', 'positive' => 'hip anterior to the ankle'],
+        'D5' => ['axis' => 'knee flexion at the joint', 'landmarks' => 'hip → knee → ankle, left side', 'positive' => 'extension; negative = flexion'],
+        'D6' => ['axis' => 'vertical plumb — knee over the ankle', 'landmarks' => 'knee → ankle, left side', 'positive' => 'knee anterior to the ankle'],
+        'D7' => ['axis' => 'ankle angle against the lower leg', 'landmarks' => 'knee → ankle → foot index, left side', 'positive' => 'dorsiflexion (toes lift)'],
+        'side_cva' => ['axis' => 'craniovertebral head angle on the SATA scale', 'landmarks' => 'ear → shoulder, right-side reference view', 'positive' => 'higher = head carried further back'],
+        'side_kyphosis' => ['axis' => 'upper-back curve indicator on the SATA scale', 'landmarks' => 'ear → shoulder → hip, right-side reference view', 'positive' => 'higher = more rounded upper back'],
+        'side_lordosis' => ['axis' => 'lower-back curve indicator on the SATA scale', 'landmarks' => 'shoulder → hip → knee, right-side reference view', 'positive' => 'higher = more lordotic lower back'],
     ],
 
     /*
@@ -859,6 +987,10 @@ return [
                 ['section' => 'side_cva', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                // The thoracic curve indicator is the direct measure of
+                // kyphosis; without it the rule could not see a rounded upper
+                // back at all.
+                ['section' => 'side_kyphosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
             'conclusion' => 'Kyphotic Posture — forward trunk translation with a rounded shoulder/forward head pattern.',
         ],
@@ -871,6 +1003,7 @@ return [
             'any' => [
                 ['section' => 'C4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'side_lordosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
             'conclusion' => 'Lordotic Posture — anterior pelvic deviation with an increased lumbar curve.',
         ],
@@ -886,10 +1019,12 @@ return [
                 ['section' => 'side_cva', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'side_kyphosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
             'any2' => [
                 ['section' => 'C4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D4', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'side_lordosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
             'conclusion' => 'Combined kyphosis and lordosis — forward upper trunk together with an anterior pelvic deviation.',
         ],
@@ -904,12 +1039,17 @@ return [
                 ['section' => 'D4', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'C6', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D6', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
+                ['section' => 'side_lordosis', 'direction' => 'below', 'level' => ['mild', 'moderate', 'severe']],
             ],
             'none' => [
                 ['section' => 'C1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D1', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'C3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
                 ['section' => 'D3', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
+                // A rounded upper back is Kyphosis, not Flatback. Blocking this
+                // pattern when the thoracic curve is above target stops the two
+                // categories being decided by the same pelvic reading.
+                ['section' => 'side_kyphosis', 'direction' => 'above', 'level' => ['mild', 'moderate', 'severe']],
             ],
             'conclusion' => 'Flat back — reduced lumbar curve with a posterior pelvic deviation and no dominant forward translation.',
         ],
@@ -1261,8 +1401,8 @@ return [
         'kyphosis'           => 'Kyphosis Posture (Increased Thoracic Kyphosis)',
         'lordosis'           => 'Lordosis Posture (Increased Lumbar Lordosis)',
         'kyphosis_lordosis'  => 'Kyphosis - Lordosis Posture',
-        'flatback'           => 'Flatback Posture',
-        'swayback'           => 'Swayback Posture',
+        'flat_back'          => 'Flatback Posture',
+        'sway_back'          => 'Swayback Posture',
         'flexed_knee'        => 'Flexed Knee Posture',
         'genu_recurvatum'    => 'Genu Recurvatum Posture',
         'frontal_asymmetry'  => 'Frontal Postural Asymmetry',
@@ -1336,6 +1476,47 @@ return [
         'normal' => ['tight' => 'Normal', 'weak' => 'Normal'],
         'moderate' => ['tight' => 'Tight', 'weak' => 'Weak'],
         'severe' => ['tight' => 'Severe', 'weak' => 'Severe'],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Muscle Map Statuses
+    |--------------------------------------------------------------------------
+    | The states a muscle highlight can carry on the muscle body image, in the
+    | order the editor offers them. Change a label or colour here and the admin
+    | page and the mobile app both follow.
+    */
+    'muscle_statuses' => [
+        'weak' => ['label' => 'Weak', 'hint' => 'Lengthened / underactive', 'color' => '#16a34a'],
+        'tight' => ['label' => 'Tight', 'hint' => 'Shortened / overactive', 'color' => '#ef4444'],
+        'severe' => ['label' => 'Very Tight', 'hint' => 'Severely shortened — treat first', 'color' => '#9f1239'],
+    ],
+
+    /*
+    | The muscle body views, matching the four assessment photos, and the
+    | default image used until an admin uploads a muscle anatomy image for
+    | that gender + view. The left side image is the right side mirrored.
+    */
+    'muscle_views' => [
+        'front' => 'Front',
+        'back' => 'Back',
+        'right_side' => 'Right Side',
+        'left_side' => 'Left Side',
+    ],
+
+    'muscle_default_images' => [
+        'male' => [
+            'front' => 'muscle-body/male-front.png',
+            'back' => 'muscle-body/male-back.png',
+            'right_side' => 'muscle-body/male-right_side.png',
+            'left_side' => 'muscle-body/male-left_side.png',
+        ],
+        'female' => [
+            'front' => 'muscle-body/female-front.png',
+            'back' => 'muscle-body/female-back.png',
+            'right_side' => 'muscle-body/female-right_side.png',
+            'left_side' => 'muscle-body/female-left_side.png',
+        ],
     ],
 
     /*
@@ -1422,8 +1603,8 @@ return [
         'Kyphosis'          => 'kyphosis',
         'Lordosis'          => 'lordosis',
         'Kyphosis-Lordosis' => 'kyphosis_lordosis',
-        'Flat Back'         => 'flatback',
-        'Swayback'          => 'swayback',
+        'Flat Back'         => 'flat_back',
+        'Swayback'          => 'sway_back',
         'Flexed Knee'       => 'flexed_knee',
         'Genu Recurvatum'   => 'genu_recurvatum',
     ],

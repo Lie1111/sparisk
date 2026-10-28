@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Models\PostureIntervention;
+use App\Services\Sparisk\TreatmentPlanService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -28,7 +29,8 @@ class InterventionController extends Controller
 
         return Inertia::render('intervention/index', [
             'interventions' => $interventions,
-            'postureTypes' => config('sparisk.intervention_posture_types'),
+            'postureTypes' => TreatmentPlanService::postureTypes(),
+            'weekdays' => PostureIntervention::WEEKDAYS,
             'ageGroups' => config('sparisk.age_groups'),
             'categories' => config('sparisk.intervention_categories'),
             'programs' => config('sparisk.intervention_programs'),
@@ -42,7 +44,7 @@ class InterventionController extends Controller
      */
     public function show(string $posture, string $age)
     {
-        $postureTypes = config('sparisk.intervention_posture_types');
+        $postureTypes = TreatmentPlanService::postureTypes();
         $ageGroups = config('sparisk.age_groups');
         $categories = config('sparisk.intervention_categories');
 
@@ -82,7 +84,7 @@ class InterventionController extends Controller
 
         PostureIntervention::create([
             'posture_type' => $validated['posture_type'],
-            'posture_label' => config('sparisk.intervention_posture_types.' . $validated['posture_type'])
+            'posture_label' => TreatmentPlanService::postureTypes()[$validated['posture_type']]
                 ?? $validated['posture_type'],
             'age_group' => $validated['age_group'],
             'category' => $validated['category'],
@@ -92,6 +94,7 @@ class InterventionController extends Controller
             'description' => $validated['description'] ?? null,
             'sets_reps' => $validated['sets_reps'] ?? null,
             'frequency' => $validated['frequency'] ?? null,
+            'days' => $this->days($validated),
             'duration_minutes' => $validated['duration_minutes'] ?? null,
             'image_path' => $image['image_path'],
             'image_url' => $image['image_url'],
@@ -114,7 +117,7 @@ class InterventionController extends Controller
 
         $intervention->update([
             'posture_type' => $validated['posture_type'],
-            'posture_label' => config('sparisk.intervention_posture_types.' . $validated['posture_type'])
+            'posture_label' => TreatmentPlanService::postureTypes()[$validated['posture_type']]
                 ?? $validated['posture_type'],
             'age_group' => $validated['age_group'],
             'category' => $validated['category'],
@@ -124,6 +127,7 @@ class InterventionController extends Controller
             'description' => $validated['description'] ?? null,
             'sets_reps' => $validated['sets_reps'] ?? null,
             'frequency' => $validated['frequency'] ?? null,
+            'days' => $this->days($validated),
             'duration_minutes' => $validated['duration_minutes'] ?? null,
             'image_path' => $image['image_path'],
             'image_url' => $image['image_url'],
@@ -181,6 +185,19 @@ class InterventionController extends Controller
         return ['image_path' => $imagePath, 'image_url' => $imageUrl];
     }
 
+    /**
+     * The chosen weekdays in calendar order; none picked falls back to the
+     * frequency so every item still lands in the weekly program.
+     *
+     * @return array<int, string>
+     */
+    private function days(array $validated): array
+    {
+        $days = array_values(array_intersect(PostureIntervention::WEEKDAYS, $validated['days'] ?? []));
+
+        return $days ?: PostureIntervention::defaultDays($validated['frequency'] ?? null, $validated['program']);
+    }
+
     private function deleteStoredImage(?string $path): void
     {
         if (!empty($path) && Storage::disk('public')->exists($path)) {
@@ -201,6 +218,8 @@ class InterventionController extends Controller
             'description' => ['nullable', 'string'],
             'sets_reps' => ['nullable', 'string', 'max:100'],
             'frequency' => ['nullable', 'string', 'max:100'],
+            'days' => ['nullable', 'array'],
+            'days.*' => ['string', 'in:' . implode(',', PostureIntervention::WEEKDAYS)],
             'duration_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
             'order_index' => ['nullable', 'integer', 'min:0'],
             'image_url' => ['nullable', 'url', 'max:1024'],
