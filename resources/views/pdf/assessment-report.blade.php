@@ -746,33 +746,57 @@
 {{-- ==================== CLASSIFICATION & FINDINGS ==================== --}}
 {{-- The result and its pattern are summarised on page one; this page carries
      the supporting detail, the primary findings and the symmetry check. --}}
-@if (count($classification['classifications']))
+@php
+    // As the app shows it: each pattern with its match score, the confirmed
+    // ones first and the other possible findings after them.
+    $patternName = fn (array $c) => trim(
+        ucfirst(strtolower((string) ($c['severity'] ?? ''))) . ' '
+        . preg_replace('/^Possible (.*) Pattern$/', '$1', $c['classification_label'] ?? str_replace('_', ' ', $c['classification_name']))
+    );
+    $confirmedPatterns = $classification['review_required'] ? [] : array_map(fn (array $c) => [
+        'label' => $patternName($c),
+        'percent' => (int) round($c['match'] ?? (float) ($c['confidence'] ?? 0)),
+    ], $classification['classifications']);
+    $possiblePatterns = $classification['possible_findings'] ?? [];
+    $patternGroups = array_filter([
+        'Posture Classification' => $confirmedPatterns,
+        ($confirmedPatterns ? 'Other Possible Findings' : 'Possible Findings') => $possiblePatterns,
+    ]);
+    $matchColor = fn (int $p) => $p >= 75 ? '#DC2626' : ($p >= 50 ? '#F59E0B' : '#2563EB');
+@endphp
+
+@if ($patternGroups)
     <div class="band first">Classification Detail</div>
-    <table class="data">
-        <thead>
-            <tr><th>Classification</th><th class="c-sec">Type</th><th class="c-sec">Alignment</th></tr>
-        </thead>
-        <tbody>
-            @foreach ($classification['classifications'] as $item)
-                <tr>
-                    <td>
-                        {{ $item['classification_label'] ?? str_replace('_', ' ', $item['classification_name']) }}
-                        @if (! empty($item['description']))
-                            <div class="muted">{{ $item['description'] }}</div>
-                        @endif
-                    </td>
-                    <td>{{ ucfirst($item['classification_type'] ?? '-') }}</td>
-                    <td style="color: {{ \App\Services\Sparisk\SpariskReportPdfService::hex($item['alignment_color'] ?? null) }}">
-                        {{ $item['alignment_label'] ?? '-' }}
-                    </td>
-                </tr>
-            @endforeach
-        </tbody>
-    </table>
+    <p class="muted" style="margin: 0 0 6px;">How closely the measurements match each posture pattern.</p>
+    @foreach ($patternGroups as $groupTitle => $patterns)
+        <table class="data">
+            <thead>
+                <tr><th>{{ $groupTitle }}</th><th class="c-sec" style="width: 45%;">Match</th><th class="c-sec" style="width: 12%;">%</th></tr>
+            </thead>
+            <tbody>
+                @foreach ($patterns as $pattern)
+                    <tr>
+                        <td>{{ $pattern['label'] }}</td>
+                        <td>
+                            <table style="width: 100%; border-collapse: collapse;"><tr>
+                                @if ($pattern['percent'] > 0)
+                                    <td style="width: {{ min(100, $pattern['percent']) }}%; height: 7px; padding: 0; border: 0; background: {{ $matchColor($pattern['percent']) }};"></td>
+                                @endif
+                                @if ($pattern['percent'] < 100)
+                                    <td style="height: 7px; padding: 0; border: 0; background: #E5E7EB;"></td>
+                                @endif
+                            </tr></table>
+                        </td>
+                        <td class="val" style="color: {{ $matchColor($pattern['percent']) }}; font-weight: bold;">{{ $pattern['percent'] }}%</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endforeach
 @endif
 
 @php
-    $detailFirst = count($classification['classifications']) === 0;
+    $detailFirst = ! $patternGroups;
 @endphp
 
 @if (count($findings))

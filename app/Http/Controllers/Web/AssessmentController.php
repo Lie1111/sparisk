@@ -221,40 +221,36 @@ class AssessmentController extends Controller
         // Classification
         $h .= '<h2>Posture Classification</h2>';
         $classification = $this->interpretationEngine->classificationSummary($a);
-        if ($classification['review_required']) {
-            $h .= '<p><strong>' . e($classification['display']) . '</strong></p>';
-            $h .= '<ul>';
-            if ($classification['review_status']) {
-                $h .= '<li>Review status: <strong>Measurement Review Required</strong></li>';
+        // Same as the app: a confirmed result with its match score and the
+        // other possible findings, or only the possible findings.
+        $findings = static function (array $list): string {
+            $h = '<ul>';
+            foreach ($list as $f) {
+                $h .= '<li>' . e($f['label']) . ' — <strong>' . (int) $f['percent'] . '% match</strong></li>';
             }
-            if ($classification['suspected_pattern']) {
-                $h .= '<li>Main finding: ' . e($classification['suspected_pattern_label']
-                    ?? 'Possible ' . str_replace('_', ' ', $classification['suspected_pattern']) . ' pattern') . '</li>';
-            }
-            if ($classification['secondary_pattern']) {
-                $h .= '<li>Secondary finding: ' . e($classification['secondary_pattern_label']
-                    ?? str_replace('_', ' ', $classification['secondary_pattern'])) . '</li>';
-            }
-            $h .= '<li>Asymmetry: ' . ($classification['asymmetry_flag'] ? 'Detected' : 'Not detected') . '</li>';
-            if ($classification['confidence_level']) {
-                $h .= '<li>Confidence: ' . e($classification['confidence_label'] ?? $classification['confidence_level']) . '</li>';
-            }
-            $h .= '</ul>';
-            $h .= '<p class="muted">' . e($classification['explanation']
-                ?? 'The measurements currently available are not sufficient to confirm a posture type. Measurement review is required.') . '</p>';
-        } else {
-            $h .= '<p><strong>' . e($classification['display']) . '</strong></p>';
-        }
 
-        if ($a->classifications->isNotEmpty()) {
+            return $h . '</ul>';
+        };
+
+        if ($classification['review_required']) {
+            $h .= '<p><strong>Possible Findings</strong></p>';
+            $h .= $classification['possible_findings']
+                ? $findings($classification['possible_findings'])
+                : '<p class="muted">No clear posture pattern found.</p>';
+        } else {
+            $h .= '<p><strong>' . e($classification['display']) . '</strong> <span class="muted">[Criteria met]</span></p>';
             $h .= '<ul>';
             foreach ($classification['classifications'] as $c) {
                 $h .= '<li><strong>' . e($c['classification_label'] ?? str_replace('_', ' ', $c['classification_name'])) . '</strong>'
+                    . ($c['match'] !== null ? ' — <strong>' . (int) $c['match'] . '% match</strong>' : '')
                     . (!empty($c['description']) ? ' — ' . e($c['description']) : '')
                     . (!empty($c['alignment_label']) ? ' <span class="muted">[' . e($c['alignment_label']) . ']</span>' : '')
                     . ' <span class="muted">[' . e($c['classification_type']) . ']</span></li>';
             }
             $h .= '</ul>';
+            if ($classification['possible_findings']) {
+                $h .= '<p><strong>Other Possible Findings</strong></p>' . $findings($classification['possible_findings']);
+            }
         }
 
         // Findings

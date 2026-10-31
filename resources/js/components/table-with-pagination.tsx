@@ -109,7 +109,10 @@ export default function TableWithPagination({
             <Card key={item.id} className="mb-4">
                 <CardContent className="p-0">
                     <div className="flex items-center justify-between p-4">
-                        <div className="space-y-1">
+                        <div
+                            className={`min-w-0 flex-1 space-y-1 ${onClickRow ? 'cursor-pointer' : ''}`}
+                            onClick={onClickRow ? () => onClickRow(item) : undefined}
+                        >
                             {visibleColumns.map((column) => (
                                 <div key={column.key}>
                                     {column.render ? column.render(item) : item[column.key]}
@@ -222,14 +225,18 @@ export default function TableWithPagination({
                                 <TableBody>
                                     {data.length > 0 ? (
                                         data.map((item) => (
-                                            <TableRow key={item.id}>
+                                            <TableRow
+                                                key={item.id}
+                                                className={onClickRow ? 'cursor-pointer' : undefined}
+                                                onClick={onClickRow ? () => onClickRow(item) : undefined}
+                                            >
                                                 {columns.map((column) => (
                                                     !column.hidden &&
                                                     <TableCell className={column.style} key={column.key}>
                                                         {column.render ? column.render(item) : item[column.key]}
                                                     </TableCell>
                                                 ))}
-                                                <TableCell>
+                                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button aria-haspopup="true" size="icon" variant="ghost">

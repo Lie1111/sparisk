@@ -1,4 +1,5 @@
 import { Head, Link } from '@inertiajs/react'
+import { PossibleFindings, classificationPercent } from '@/components/possible-findings'
 import AppLayout from '@/layouts/app-layout'
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -153,10 +154,14 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                 <p className={`font-semibold ${isUnclassified ? 'text-orange-600' : ''}`}>
                                     {classificationDisplay}
                                 </p>
-                                {(classificationInfo.confidence_label || classificationInfo.confidence_level) && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {classificationInfo.confidence_label || `${classificationInfo.confidence_level} confidence`}
-                                    </p>
+                                {isUnclassified ? (
+                                    classificationInfo.possible_findings?.[0] && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Strongest: {classificationInfo.possible_findings[0].label} ({classificationInfo.possible_findings[0].percent}%)
+                                        </p>
+                                    )
+                                ) : (
+                                    classifications.length > 0 && <p className="text-xs text-muted-foreground">Criteria met</p>
                                 )}
                             </div>
                         </CardContent>
@@ -295,50 +300,15 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2 text-base text-orange-700">
                                         <Info className="h-4 w-4" />
-                                        {classificationDisplay}
+                                        No single pattern confirmed
                                     </CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-2 text-sm">
-                                    <div className="grid gap-2 sm:grid-cols-2">
-                                        <div className="flex justify-between gap-2">
-                                            <span className="text-muted-foreground">Review Status</span>
-                                            <span className="font-medium">Measurement Review Required</span>
-                                        </div>
-                                        {classificationInfo.suspected_pattern && (
-                                            <div className="flex justify-between gap-2">
-                                                <span className="text-muted-foreground">Suspected Pattern</span>
-                                                <span className="font-medium">
-                                                    {classificationInfo.suspected_pattern_label
-                                                        || `Possible ${humanize(classificationInfo.suspected_pattern)} Pattern`}
-                                                </span>
-                                            </div>
-                                        )}
-                                        {classificationInfo.secondary_pattern && (
-                                            <div className="flex justify-between gap-2">
-                                                <span className="text-muted-foreground">Secondary Finding</span>
-                                                <span className="font-medium">
-                                                    {classificationInfo.secondary_pattern_label
-                                                        || humanize(classificationInfo.secondary_pattern)}
-                                                </span>
-                                            </div>
-                                        )}
-                                        <div className="flex justify-between gap-2">
-                                            <span className="text-muted-foreground">Asymmetry</span>
-                                            <span className="font-medium">{classificationInfo.asymmetry_flag ? 'Detected' : 'Not detected'}</span>
-                                        </div>
-                                        {(classificationInfo.confidence_label || classificationInfo.confidence_level) && (
-                                            <div className="flex justify-between gap-2">
-                                                <span className="text-muted-foreground">Confidence</span>
-                                                <span className="font-medium">
-                                                    {classificationInfo.confidence_label || classificationInfo.confidence_level}
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    <p className="text-muted-foreground">
-                                        {classificationInfo.explanation
-                                            || 'The measurements currently available are not sufficient to suggest a posture pattern. Measurement review is required.'}
-                                    </p>
+                                <CardContent className="text-sm">
+                                    {classificationInfo.possible_findings?.length ? (
+                                        <PossibleFindings findings={classificationInfo.possible_findings} />
+                                    ) : (
+                                        <p className="text-muted-foreground">No clear posture pattern found.</p>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}
@@ -359,18 +329,7 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                     <span className="text-muted-foreground">Main Finding</span>
                                     <span className="font-medium">{classificationInfo.main_finding || '-'}</span>
                                 </div>
-                                <div className="flex justify-between gap-2">
-                                    <span className="text-muted-foreground">Suspected Pattern</span>
-                                    <span className="font-medium">
-                                        {classificationInfo.suspected_pattern_label || '-'}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between gap-2">
-                                    <span className="text-muted-foreground">Secondary Finding</span>
-                                    <span className="font-medium">
-                                        {classificationInfo.secondary_pattern_label || '-'}
-                                    </span>
-                                </div>
+
                                 <div className="flex justify-between gap-2">
                                     <span className="text-muted-foreground">Asymmetry</span>
                                     <span className="font-medium">
@@ -378,10 +337,8 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                     </span>
                                 </div>
                                 <div className="flex justify-between gap-2">
-                                    <span className="text-muted-foreground">Confidence</span>
-                                    <span className="font-medium">
-                                        {classificationInfo.confidence_label || classificationInfo.confidence_level || '-'}
-                                    </span>
+                                    <span className="text-muted-foreground">Status</span>
+                                    <span className="font-medium">{isUnclassified ? 'Not confirmed' : 'Criteria met'}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -407,13 +364,21 @@ export default function AssessmentShow({ assessment, viewMeasurements, classific
                                                     {outputStatusLabels[outputStatusOf(c)]}
                                                 </Badge>
                                             )}
-                                            {c.confidence && (
-                                                <p className="text-xs text-muted-foreground mt-1">{c.confidence}% confidence</p>
+                                            {classificationPercent(c) != null && (
+                                                <p className="text-xs text-muted-foreground mt-1">{classificationPercent(c)}% match</p>
                                             )}
                                         </div>
                                     </CardContent>
                                 </Card>
                             ))
+                        )}
+
+                        {!isUnclassified && classificationInfo.possible_findings?.length > 0 && (
+                            <Card>
+                                <CardContent className="py-4">
+                                    <PossibleFindings title="Other Possible Findings" findings={classificationInfo.possible_findings} />
+                                </CardContent>
+                            </Card>
                         )}
 
                         {assessment.clinical_summary && (

@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('auth:sanctum')->group(function () {
 
     // Patients
-    Route::apiResource('patients', PatientController::class);
+    Route::apiResource('patients', PatientController::class)->names('api.patients');
     Route::get('patients/{patient}/assessments', [PatientController::class, 'assessments']);
 
     // BMI - central SATA age + gender classification
@@ -69,7 +69,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('reports/patient', [ReportController::class, 'patientReports']);
 
     // Academies
-    Route::apiResource('academies', AcademyController::class)->except(['edit', 'create']);
+    Route::apiResource('academies', AcademyController::class)->except(['edit', 'create'])->names('api.academies');
     Route::post('academies/{academy}/members', [AcademyController::class, 'addMember']);
     Route::delete('academies/{academy}/members/{member}', [AcademyController::class, 'removeMember']);
     Route::get('academies/{academy}/members', [AcademyController::class, 'members']);

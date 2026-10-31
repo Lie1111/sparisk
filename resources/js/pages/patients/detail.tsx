@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PossibleFindings, classificationPercent } from '@/components/possible-findings';
 import { Head, Link } from '@inertiajs/react';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
@@ -196,10 +197,14 @@ export default function AssessmentDetail({ patient, assessment, viewMeasurements
                                 <p className={`font-semibold ${isUnclassified ? 'text-orange-600' : ''}`}>
                                     {classificationDisplay}
                                 </p>
-                                {(classificationInfo.confidence_label || classificationInfo.confidence_level) && (
-                                    <p className="text-xs text-muted-foreground">
-                                        {classificationInfo.confidence_label || `${classificationInfo.confidence_level} confidence`}
-                                    </p>
+                                {isUnclassified ? (
+                                    classificationInfo.possible_findings?.[0] && (
+                                        <p className="text-xs text-muted-foreground">
+                                            Strongest: {classificationInfo.possible_findings[0].label} ({classificationInfo.possible_findings[0].percent}%)
+                                        </p>
+                                    )
+                                ) : (
+                                    classifications.length > 0 && <p className="text-xs text-muted-foreground">Criteria met</p>
                                 )}
                             </div>
                         </CardContent>
@@ -304,38 +309,15 @@ export default function AssessmentDetail({ patient, assessment, viewMeasurements
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {isUnclassified && (
-                                    <div className="rounded-md border border-orange-200 bg-orange-50/50 p-3 text-sm">
-                                        <p className="font-medium text-orange-700">{classificationDisplay}</p>
-                                        <div className="mt-2 space-y-1">
-                                            {classificationInfo.suspected_pattern && (
-                                                <p>
-                                                    <span className="text-muted-foreground">Main finding:</span>{' '}
-                                                    {classificationInfo.suspected_pattern_label
-                                                        || `Possible ${humanize(classificationInfo.suspected_pattern)} pattern`}
-                                                </p>
-                                            )}
-                                            {classificationInfo.secondary_pattern && (
-                                                <p>
-                                                    <span className="text-muted-foreground">Secondary finding:</span>{' '}
-                                                    {classificationInfo.secondary_pattern_label
-                                                        || humanize(classificationInfo.secondary_pattern)}
-                                                </p>
-                                            )}
-                                            <p><span className="text-muted-foreground">Asymmetry:</span> {classificationInfo.asymmetry_flag ? 'Detected' : 'Not detected'}</p>
-                                            {(classificationInfo.confidence_label || classificationInfo.confidence_level) && (
-                                                <p>
-                                                    <span className="text-muted-foreground">Confidence:</span>{' '}
-                                                    {classificationInfo.confidence_label || classificationInfo.confidence_level}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <p className="mt-2 text-muted-foreground">
-                                            {classificationInfo.explanation
-                                                || 'The measurements currently available are not sufficient to suggest a posture pattern. Measurement review is required.'}
-                                        </p>
+                                    <div className="rounded-md border p-3 text-sm">
+                                        {classificationInfo.possible_findings?.length ? (
+                                            <PossibleFindings findings={classificationInfo.possible_findings} />
+                                        ) : (
+                                            <p className="text-muted-foreground">No clear posture pattern found.</p>
+                                        )}
                                     </div>
                                 )}
-                                {classifications.map((c: any) => (
+                                {!isUnclassified && classifications.map((c: any) => (
                                     <div key={c.id} className="flex items-center gap-3 rounded-md border p-2 text-sm">
                                         <Badge variant={c.classification_type === 'primary' ? 'default' : 'secondary'} className="text-[10px]">
                                             {c.classification_type}
@@ -348,8 +330,16 @@ export default function AssessmentDetail({ patient, assessment, viewMeasurements
                                                 {alignmentLabelOf(c)}
                                             </Badge>
                                         )}
+                                        {classificationPercent(c) != null && (
+                                            <span className="text-xs font-semibold tabular-nums text-muted-foreground">{classificationPercent(c)}%</span>
+                                        )}
                                     </div>
                                 ))}
+                                {!isUnclassified && classificationInfo.possible_findings?.length > 0 && (
+                                    <div className="rounded-md border p-3">
+                                        <PossibleFindings title="Other Possible Findings" findings={classificationInfo.possible_findings} />
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     )}

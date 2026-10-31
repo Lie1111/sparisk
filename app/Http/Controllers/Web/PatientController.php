@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Patient;
 use App\Models\PostureAssessment;
 use App\Services\Sparisk\AquaticSkillsProgressService;
+use App\Services\Sparisk\MuscleMapService;
 use App\Services\Sparisk\SpariskBmiEngine;
 use App\Services\Sparisk\SpariskInterpretationEngine;
 use Illuminate\Http\Request;
@@ -20,6 +21,7 @@ class PatientController extends Controller
         private SpariskInterpretationEngine $interpretationEngine,
         private SpariskBmiEngine $bmiEngine,
         private AquaticSkillsProgressService $skillsProgress,
+        private MuscleMapService $muscleMap,
     ) {}
 
     public function index(Request $request)
@@ -44,6 +46,8 @@ class PatientController extends Controller
         }
 
         $patients = $query
+            ->withCount('postureAssessments')
+            ->with(['postureAssessments' => fn($q) => $q->latest('assessment_date')->latest('id')])
             ->orderBy($sort, $order)
             ->paginate($perPage = 25, $columns = ['*'], $pageName = 'patients');
 
@@ -64,7 +68,9 @@ class PatientController extends Controller
                 'emergency_contact_name' => $patient->emergency_contact_name,
                 'emergency_contact_phone' => $patient->emergency_contact_phone,
                 'special_needs_type' => $patient->special_needs_type,
-                'assessment_count' => $patient->postureAssessments()->count(),
+                'assessment_count' => $patient->posture_assessments_count,
+                'latest_assessment' => $this->latestAssessmentSummary($patient),
+                'bmi' => $this->bmiEngine->forPatient($patient),
                 'updated_at' => $patient->updated_at,
             ];
         });
@@ -339,6 +345,32 @@ class PatientController extends Controller
         });
 
         return redirect()->route('patients.index', ['patients' => $request->patients]);
+    }
+
+    /**
+     * What the patient list shows of the latest assessment: its date, score
+     * and the problems it found, named as the app names them.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function latestAssessmentSummary(Patient $patient): ?array
+    {
+        $assessment = $patient->postureAssessments->first();
+        if ($assessment === null) {
+            return null;
+        }
+
+        $problems = collect($this->muscleMap->detect($assessment))
+            ->map(fn(array $m) => ['name' => $m['condition']->name, 'certainty' => $m['certainty']])
+            ->values();
+
+        return [
+            'id' => $assessment->id,
+            'date' => $assessment->assessment_date,
+            'score' => $assessment->overall_score,
+            'status' => $assessment->overall_status,
+            'problems' => $problems->all(),
+        ];
     }
 
     private function nullIfEmpty(mixed $value): mixed

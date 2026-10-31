@@ -382,9 +382,16 @@ class SpariskReportPdfService
         return self::STATUS_HEX[$color] ?? self::STATUS_HEX['grey'];
     }
 
+    /**
+     * "Ali_Report_SATA.pdf": the patient's name, each word capitalised and
+     * joined by underscores, with anything unsafe in a filename dropped.
+     */
     public function filename(PostureAssessment $assessment): string
     {
-        return 'SPARISK_Report_'.$assessment->id.'.pdf';
+        $words = preg_split('/[^\pL\pN]+/u', (string) $assessment->patient?->name, -1, PREG_SPLIT_NO_EMPTY);
+        $name = implode('_', array_map(fn (string $w) => mb_convert_case($w, MB_CASE_TITLE), $words)) ?: 'Patient';
+
+        return $name.'_Report_SATA.pdf';
     }
 
     /**

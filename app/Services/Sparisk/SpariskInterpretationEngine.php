@@ -172,7 +172,26 @@ class SpariskInterpretationEngine
             // hardcoded one.
             'explanation' => $isUnclassified ? $this->unclassifiedExplanation($assessment) : null,
             'classifications' => $this->enrichClassifications($assessment),
+            'possible_findings' => $this->possibleFindings($assessment),
         ];
+    }
+
+    /**
+     * What else the assessment may show besides any confirmed classification,
+     * as short labels with a match percentage, e.g. "Moderate Kyphosis" 75%.
+     * The decision engine depends on this class, so it is resolved here
+     * rather than injected.
+     *
+     * @return array<int, array{label: string, percent: int}>
+     */
+    private function possibleFindings(PostureAssessment $assessment): array
+    {
+        return collect(app(SpariskDecisionEngine::class)->possibleFindings($assessment))
+            ->map(fn (array $finding) => [
+                'label' => preg_replace('/^Possible (.*) Pattern$/', '$1', (string) $this->patternTokenLabel($finding['token'])),
+                'percent' => $finding['match'],
+            ])
+            ->all();
     }
 
     /**
@@ -269,13 +288,17 @@ class SpariskInterpretationEngine
     public function enrichClassifications(PostureAssessment $assessment): array
     {
         $statuses = config('sparisk.alignment_statuses');
+        $matches = app(SpariskDecisionEngine::class)->matchScores($assessment);
 
         return $assessment->classifications
-            ->map(function ($classification) use ($statuses) {
+            ->map(function ($classification) use ($statuses, $matches) {
                 $status = $classification->severity;
                 $meta = $status !== null ? ($statuses[$status] ?? null) : null;
 
                 return array_merge($classification->toArray(), [
+                    // Same 0-100 scale as the possible findings; `confidence`
+                    // only says whether enough evidence was found to confirm.
+                    'match' => $matches[$classification->classification_name] ?? null,
                     'classification_label' => $this->patternLabel($classification->classification_name),
                     'alignment_status' => $status,
                     'alignment_label' => $meta['label'] ?? null,
@@ -451,11 +474,14 @@ class SpariskInterpretationEngine
         $problems = $this->problemAreas($assessment);
 
         if ($isUnclassified) {
-            $sentences = ['No single posture pattern could be identified from the measurements available.'];
-            $suspected = $this->patternTokenLabel($assessment->suspected_pattern);
-            if ($suspected !== null) {
-                $sentences[] = "The strongest sign currently points to {$suspected}.";
-            }
+            // Named as the Possible Findings list names them, so the two agree.
+            $findings = array_map(
+                fn(array $f) => "{$f['label']} ({$f['percent']}%)",
+                array_slice($this->possibleFindings($assessment), 0, 3),
+            );
+            $sentences = $findings === []
+                ? ['The measurements do not point to one clear posture pattern yet.']
+                : ['The measurements point to a possible ' . $this->joinList($findings) . '.'];
         } else {
             $label = $this->patternLabel($assessment->posture_classification)
                 ?? ucwords(strtolower(str_replace('_', ' ', (string) $assessment->posture_classification)));
@@ -473,6 +499,14 @@ class SpariskInterpretationEngine
             'summary' => implode(' ', $sentences),
             'problems' => $problems,
         ];
+    }
+
+    /** "a", "a and b", "a, b and c". */
+    private function joinList(array $items): string
+    {
+        $last = array_pop($items);
+
+        return $items === [] ? (string) $last : implode(', ', $items) . ' and ' . $last;
     }
 
     /**

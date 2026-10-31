@@ -21,6 +21,14 @@ export type Patient = {
     neuro_condition_labels?: string[] | null;
     neuro_conditions_other?: string | null;
     assessment_count: number;
+    latest_assessment?: {
+        id: number;
+        date: string | null;
+        score: number | null;
+        status: string | null;
+        problems: { name: string; certainty: 'confirmed' | 'measured' | 'possible' }[];
+    } | null;
+    bmi?: { bmi: number | null; category: string | null; valid: boolean } | null;
     updated_at: string;
 };
 

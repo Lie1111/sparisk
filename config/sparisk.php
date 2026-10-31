@@ -515,6 +515,37 @@ return [
     'derived_sections' => ['B7', 'B8'],
 
     /*
+    |--------------------------------------------------------------------------
+    | Possible-finding match score
+    |--------------------------------------------------------------------------
+    | How strongly an unconfirmed pattern is shown, for the Possible Findings
+    | list. Each matched reading counts by how directly it measures the pattern
+    | (`direct` sections, `indirect` sections, anything else is supporting) and
+    | by how far off it is. Within one parameter the strongest reading counts
+    | in full and every other agreeing view adds `agreement_bonus` of its own
+    | weight. `full_strength` is the total that reads as 100%: two strong,
+    | direct readings. It never changes what is confirmed.
+    */
+    'match_score' => [
+        'role_weights' => ['direct' => 1.0, 'supporting' => 0.6, 'indirect' => 0.3],
+        'level_weights' => ['mild' => 0.6, 'moderate' => 0.85, 'severe' => 1.0],
+        'agreement_bonus' => 0.25,
+        'full_strength' => 2.0,
+        'rules' => [
+            'KYPHOSIS' => ['direct' => ['side_kyphosis'], 'indirect' => ['C1', 'D1', 'side_cva']],
+            'LORDOSIS' => ['direct' => ['side_lordosis']],
+            'KYPHOSIS_LORDOSIS' => ['direct' => ['side_kyphosis', 'side_lordosis'], 'indirect' => ['C1', 'D1', 'side_cva']],
+            'FLATBACK' => ['direct' => ['side_lordosis'], 'indirect' => ['C6', 'D6']],
+            'SWAYBACK' => ['direct' => ['C1', 'D1']],
+            'FLEXED_KNEE' => ['direct' => ['C5', 'D5', 'A8', 'A9']],
+            'GENU_RECURVATUM' => ['direct' => ['C5', 'D5']],
+            'FORWARD_HEAD' => ['direct' => ['C2', 'D2', 'side_cva']],
+            'ROUNDED_SHOULDER' => ['direct' => ['C3', 'D3']],
+            'PELVIC_OBLIQUITY' => ['direct' => ['A7', 'B6']],
+        ],
+    ],
+
+    /*
     | Midline parameters are not side-specific: both side views describe the
     | same head/trunk/curve. Their pattern tokens must not be prefixed with
     | RIGHT/LEFT, which would read as a one-sided finding.

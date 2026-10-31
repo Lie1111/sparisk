@@ -76,13 +76,15 @@ class MuscleMapService
             }
 
             if ($certainty !== null) {
-                $matches[] = ['condition' => $condition, 'certainty' => $certainty, 'evidence' => array_values(array_unique($evidence))];
+                // Possible conditions keep the decision engine's order, strongest first.
+                $rank = $certainty === 'possible' ? min(array_keys(array_intersect($possible, $keys))) : 0;
+                $matches[] = ['condition' => $condition, 'certainty' => $certainty, 'evidence' => array_values(array_unique($evidence)), 'rank' => $rank];
             }
         }
 
-        usort($matches, fn($a, $b) => $certaintyRank[$a['certainty']] <=> $certaintyRank[$b['certainty']]);
+        usort($matches, fn($a, $b) => [$certaintyRank[$a['certainty']], $a['rank']] <=> [$certaintyRank[$b['certainty']], $b['rank']]);
 
-        return $matches;
+        return array_map(fn(array $match) => array_diff_key($match, ['rank' => true]), $matches);
     }
 
     /**

@@ -107,7 +107,7 @@ export default function Index({
         router.get(`/patients/${patient.id}`);
     };
 
-    const columns = buildColumns({ onSort: handleSort, onView: handleView });
+    const columns = buildColumns({ onSort: handleSort });
     const actions = buildActions({ onView: handleView, onEdit: handleEdit, onDelete: handleDelete });
 
     const breadcrumbs: BreadcrumbItem[] = [{ title: 'Patients', href: '/patients' }];
@@ -135,6 +135,7 @@ export default function Index({
                     onSearch={handleSearch}
                     onPageChange={handlePageChange}
                     onAdd={handleAdd}
+                    onClickRow={handleView}
                 />
 
                 {openForm && (

@@ -38,9 +38,7 @@ class SpariskDecisionEngine
         $symmetry = $this->interpretationEngine->generateSymmetry($assessment);
         $asymmetryFlag = collect($symmetry)->contains(fn (array $pair) => $pair['status'] !== 'symmetrical');
 
-        $evaluations = collect(config('sparisk.decision_rules'))
-            ->map(fn (array $rule) => $this->evaluateRule($rule, $measurements, $dataQuality, $policy, $gapSections))
-            ->all();
+        $evaluations = $this->evaluations($measurements, $dataQuality, $policy, $gapSections);
 
         $confirmed = collect($evaluations)
             ->where('status', 'confirmed')
@@ -49,7 +47,7 @@ class SpariskDecisionEngine
 
         $candidates = collect($evaluations)
             ->whereIn('status', ['suspected', 'insufficient_data'])
-            ->sortByDesc(fn (array $evaluation) => [$evaluation['confidence'], $evaluation['evidence']])
+            ->sortByDesc(fn (array $evaluation) => [$evaluation['match'], $evaluation['confidence']])
             ->values();
 
         $primary = $confirmed->first();
@@ -106,6 +104,69 @@ class SpariskDecisionEngine
             'primary_classification' => $isUnclassified ? $unclassified['code'] : $primary['classification'],
             'symmetry' => $symmetry,
         ];
+    }
+
+    /**
+     * The patterns an assessment points towards but did not confirm, strongest
+     * first, each with its match score (0-100, @see matchScore()). Read only:
+     * nothing is stored, so it can be shown on any existing assessment.
+     *
+     * @return array<int, array{classification: string, token: string, match: int}>
+     */
+    public function possibleFindings(PostureAssessment $assessment, int $limit = 4): array
+    {
+        $evaluations = $this->evaluationsFor($assessment);
+        $confirmed = collect($evaluations)->where('status', 'confirmed')->pluck('classification')->all();
+
+        return collect($evaluations)
+            ->whereIn('status', ['suspected', 'insufficient_data'])
+            ->whereNotIn('classification', $confirmed)
+            ->where('match', '>', 0)
+            ->sortByDesc(fn (array $evaluation) => [$evaluation['match'], $evaluation['confidence']])
+            ->unique('classification')
+            ->take($limit)
+            ->map(fn (array $evaluation) => [
+                'classification' => $evaluation['classification'],
+                'token' => $evaluation['token'],
+                'match' => (int) $evaluation['match'],
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Match score per classification the assessment matched, so a confirmed
+     * classification can be shown with the same 0-100 scale as the possible
+     * findings beside it.
+     *
+     * @return array<string, int>
+     */
+    public function matchScores(PostureAssessment $assessment): array
+    {
+        return collect($this->evaluationsFor($assessment))
+            ->where('status', '!=', 'not_matched')
+            ->groupBy('classification')
+            ->map(fn (Collection $evaluations) => (int) $evaluations->max('match'))
+            ->all();
+    }
+
+    private function evaluationsFor(PostureAssessment $assessment): array
+    {
+        $measurements = $assessment->measurements()->get()->keyBy('section');
+
+        return $this->evaluations(
+            $measurements,
+            $this->dataQuality($measurements),
+            config('sparisk.classification_policy'),
+            $this->structuralGapSections($measurements),
+        );
+    }
+
+    private function evaluations(Collection $measurements, float $dataQuality, array $policy, array $gapSections): array
+    {
+        return collect(config('sparisk.decision_rules'))
+            ->map(fn (array $rule) => $this->evaluateRule($rule, $measurements, $dataQuality, $policy, $gapSections))
+            ->all();
     }
 
     /**
@@ -249,6 +310,7 @@ class SpariskDecisionEngine
             'matched_parameters' => $matchedParameters->all(),
             'missing_sections' => $missing,
             'confidence' => $confidence,
+            'match' => $this->matchScore($rule, $measurements, array_keys($matchedSections), $dataQuality),
             'level' => $this->worstLevel($levels),
             'severity' => $this->worstLevel($levels) ?? ($rule['severity'] ?? null),
             'side' => $this->side($measurements, array_keys($matchedSections)),
@@ -328,6 +390,44 @@ class SpariskDecisionEngine
      * C4/D4, C5/D5 and A1/B1 are the same anatomical parameter measured from
      * different views; they must count once when a rule is scored.
      */
+    /**
+     * How strongly the matched readings show the rule's pattern, 0-100.
+     *
+     * Unlike `confidence`, which only counts independent parameters, this
+     * weighs each reading by how directly it measures the pattern and how far
+     * off it is, and lets agreeing views of one parameter add a little. So a
+     * flattened lower-back curve outweighs a head angle as evidence of Flat
+     * Back, and three agreeing head readings outweigh one mild knee reading.
+     */
+    private function matchScore(array $rule, Collection $measurements, array $sections, float $dataQuality): int
+    {
+        $config = config('sparisk.match_score');
+        $roles = $config['rules'][$rule['id']] ?? [];
+
+        $strength = collect($sections)
+            ->map(function (string $section) use ($measurements, $roles, $config) {
+                $role = match (true) {
+                    in_array($section, $roles['direct'] ?? [], true) => 'direct',
+                    in_array($section, $roles['indirect'] ?? [], true) => 'indirect',
+                    default => 'supporting',
+                };
+                $level = $measurements->get($section)?->alignment_status;
+
+                return [
+                    'parameter' => $this->parameterKey($section),
+                    'weight' => $config['role_weights'][$role] * ($config['level_weights'][$level] ?? 0),
+                ];
+            })
+            ->groupBy('parameter')
+            ->sum(function (Collection $readings) use ($config) {
+                $weights = $readings->pluck('weight')->sortDesc()->values();
+
+                return $weights->first() + $config['agreement_bonus'] * $weights->skip(1)->sum();
+            });
+
+        return (int) round(min(1.0, $strength / $config['full_strength']) * 100 * $dataQuality);
+    }
+
     private function parameterKey(string $section): string
     {
         return (string) config("sparisk.section_parameters.{$section}", $section);
