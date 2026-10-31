@@ -3,10 +3,13 @@
 namespace Database\Seeders;
 
 use App\Models\PostureIntervention;
+use Database\Seeders\Concerns\PublishesSeedImages;
 use Illuminate\Database\Seeder;
 
 class InterventionSeeder extends Seeder
 {
+    use PublishesSeedImages;
+
     private const INTERVENTIONS = [
         [
             'posture_type' => 'normal_neutral',
@@ -2854,8 +2857,13 @@ class InterventionSeeder extends Seeder
         ]
     ];
 
+    /** Age groups that start from a copy of the 13-18 plans. */
+    private const COPIED_AGE_GROUPS = ['6-8', '9-12', '19-49'];
+
     public function run(): void
     {
+        $this->publishSeedImages('interventions/plan');
+
         foreach (self::INTERVENTIONS as $intervention) {
             PostureIntervention::updateOrCreate(
                 [
@@ -2865,6 +2873,20 @@ class InterventionSeeder extends Seeder
                 ],
                 $intervention
             );
+        }
+
+        // Only an empty age group gets the copy, so the admin's own edits to
+        // an age group are never replaced.
+        $source = PostureIntervention::where('age_group', '13-18')->orderBy('id')->get();
+        foreach (self::COPIED_AGE_GROUPS as $ageGroup) {
+            if (PostureIntervention::where('age_group', $ageGroup)->exists()) {
+                continue;
+            }
+            foreach ($source as $item) {
+                $copy = $item->replicate();
+                $copy->age_group = $ageGroup;
+                $copy->save();
+            }
         }
     }
 }

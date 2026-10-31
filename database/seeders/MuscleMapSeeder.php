@@ -4,10 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\MuscleCondition;
 use App\Models\MuscleHighlight;
+use Database\Seeders\Concerns\PublishesSeedImages;
 use Illuminate\Database\Seeder;
 
 class MuscleMapSeeder extends Seeder
 {
+    use PublishesSeedImages;
+
     private const CONDITIONS = [
         'kyphosis' => [
             'name' => 'Kyphosis',
@@ -21720,6 +21723,8 @@ Reduced control of the knee when landing',
 
     public function run(): void
     {
+        $this->publishSeedImages('muscle-body');
+
         foreach (self::CONDITIONS as $slug => $condition) {
             if (MuscleCondition::where('slug', $slug)->exists()) {
                 continue;

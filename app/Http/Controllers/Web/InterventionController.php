@@ -198,9 +198,18 @@ class InterventionController extends Controller
         return $days ?: PostureIntervention::defaultDays($validated['frequency'] ?? null, $validated['program']);
     }
 
+    /**
+     * Delete an image file once no item uses it any more. Age groups and
+     * conditions share pictures, so an edit to one item must not remove the
+     * image from the others.
+     */
     private function deleteStoredImage(?string $path): void
     {
-        if (!empty($path) && Storage::disk('public')->exists($path)) {
+        if (empty($path) || PostureIntervention::where('image_path', $path)->count() > 1) {
+            return;
+        }
+
+        if (Storage::disk('public')->exists($path)) {
             Storage::disk('public')->delete($path);
         }
     }
